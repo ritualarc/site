@@ -17,8 +17,6 @@ NAV_LINKS = [
     ("/manifesto", "The Manifesto"),
     ("/signals", "Signals"),
     ("/advisory", "Advisory"),
-    ("/about", "About"),
-    ("/contact", "Contact"),
 ]
 
 
