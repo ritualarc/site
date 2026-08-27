@@ -1,9 +1,15 @@
+import logging
+import smtplib
 from pathlib import Path
 
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+
+from mailer import EmailNotConfiguredError, send_contact_email
+
+logger = logging.getLogger(__name__)
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -66,7 +72,12 @@ def contact_submit(
     email: str = Form(...),
     message: str = Form(...),
 ):
-    # No email backend is wired up yet; the submission is simply acknowledged.
+    try:
+        send_contact_email(first_name, last_name, email, message)
+    except (EmailNotConfiguredError, smtplib.SMTPException, OSError):
+        logger.exception("Failed to send contact form email")
+        return render(request, "contact.html", active="/contact", submitted=False, send_failed=True)
+
     return render(request, "contact.html", active="/contact", submitted=True, first_name=first_name)
 
 

@@ -16,6 +16,11 @@
     <p>Thanks for submitting, {{ first_name }}! We'll be in touch soon.</p>
   </div>
   {% else %}
+  {% if send_failed %}
+  <div class="confirmation" style="border-color: #c94b4b;">
+    <p>Sorry, something went wrong sending your message. Please try again shortly, or email us directly.</p>
+  </div>
+  {% endif %}
   <form class="contact-form" method="post" action="/contact">
     <div class="form-row">
       <div>
