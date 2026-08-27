@@ -14,7 +14,6 @@ app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
 
 NAV_LINKS = [
-    ("/", "Home"),
     ("/manifesto", "The Manifesto"),
     ("/signals", "Signals"),
     ("/advisory", "Advisory"),
