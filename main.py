@@ -23,6 +23,8 @@ NAV_LINKS = [
     ("/manifesto", "The Manifesto"),
     ("/signals", "Signals"),
     ("/advisory", "Advisory"),
+    ("/login", "Login"),
+    ("/signup", "Signup"),
 ]
 
 
@@ -79,6 +81,16 @@ def contact_submit(
         return render(request, "contact.html", active="/contact", submitted=False, send_failed=True)
 
     return render(request, "contact.html", active="/contact", submitted=True, first_name=first_name)
+
+
+@app.get("/login")
+def login(request: Request):
+    return render(request, "coming_soon.html", active="/login", page_title="Login")
+
+
+@app.get("/signup")
+def signup(request: Request):
+    return render(request, "coming_soon.html", active="/signup", page_title="Signup")
 
 
 @app.get("/privacy-policy")
