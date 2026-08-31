@@ -44,6 +44,11 @@ def render(request: Request, template_name: str, **context):
     )
 
 
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    return RedirectResponse(url="/static/favicon.png")
+
+
 @app.get("/")
 def home(request: Request):
     return render(request, "index.html", active="/")
