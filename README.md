@@ -31,6 +31,36 @@ Variables settings):
 Without `SMTP_USERNAME`/`SMTP_PASSWORD` set, submissions fail gracefully with an on-page error message
 instead of pretending to succeed.
 
+## Signup / Auth0
+
+The two buttons on `/signup` ("Customer" and "Company") each start an Auth0 Universal Login signup
+flow (`auth.py` + the `/signup/{account_type}` and `/auth/callback` routes in `main.py`), then land on
+a bare `/dashboard` page showing the chosen account type top-left and "Logged in as" (name/email)
+top-right.
+
+Auth0 is set up as a **Regular Web Application** (server-side Authorization Code flow — this app
+renders pages server-side, so it needs a confidential client that can hold a client secret, not a
+Single Page Application client).
+
+In the Auth0 dashboard, on that application's settings:
+
+- **Allowed Callback URLs**: `http://127.0.0.1:8000/auth/callback` (local) and
+  `https://<your-vercel-domain>/auth/callback` (production)
+- **Allowed Logout URLs / Web Origins**: your site's root URL, same pattern
+
+Then set these environment variables (locally via `export`, or in Vercel's Environment Variables
+settings):
+
+| Variable | Required | Description |
+| --- | --- | --- |
+| `AUTH0_DOMAIN` | yes | e.g. `your-tenant.us.auth0.com` |
+| `AUTH0_CLIENT_ID` | yes | From the Auth0 application settings |
+| `AUTH0_CLIENT_SECRET` | yes | From the Auth0 application settings |
+| `SESSION_SECRET_KEY` | yes in production | Random secret used to sign the session cookie; without it a hardcoded dev default is used |
+
+Without `AUTH0_DOMAIN`/`AUTH0_CLIENT_ID`/`AUTH0_CLIENT_SECRET` set, `/signup` shows an "isn't
+configured yet" message instead of the buttons erroring out.
+
 ## Deploying to Vercel
 
 ```bash

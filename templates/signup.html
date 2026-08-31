@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Signup — The Ritual Arc{% endblock %}
+{% block content %}
+
+<section class="hero">
+  <h1>Create an Account</h1>
+  <p class="tagline">Choose the account type that fits you.</p>
+</section>
+
+<section>
+  {% if auth_not_configured %}
+  <div class="confirmation" style="border-color: #c94b4b;">
+    <p>Sign up isn't configured yet. Please check back soon.</p>
+  </div>
+  {% else %}
+  <div style="display: flex; gap: 1.5rem; justify-content: center; flex-wrap: wrap;">
+    <a class="button" href="/signup/member">Member</a>
+    <a class="button" href="/signup/brand">Brand</a>
+  </div>
+  {% endif %}
+</section>
+
+{% endblock %}

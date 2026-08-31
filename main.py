@@ -1,12 +1,15 @@
 import logging
+import os
 import smtplib
 from pathlib import Path
 
-from fastapi import FastAPI, Form, Request
+from fastapi import FastAPI, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.middleware.sessions import SessionMiddleware
 
+from auth import AUTH0_CONFIGURED, oauth
 from mailer import EmailNotConfiguredError, send_contact_email
 
 logger = logging.getLogger(__name__)
@@ -14,6 +17,11 @@ logger = logging.getLogger(__name__)
 BASE_DIR = Path(__file__).resolve().parent
 
 app = FastAPI(title="The Ritual Arc")
+
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=os.environ.get("SESSION_SECRET_KEY", "dev-insecure-secret-key-change-me"),
+)
 
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 
@@ -88,9 +96,43 @@ def login(request: Request):
     return render(request, "coming_soon.html", active="/login", page_title="Login")
 
 
+ACCOUNT_TYPES = {"member": "Member", "brand": "Brand"}
+
+
 @app.get("/signup")
 def signup(request: Request):
-    return render(request, "coming_soon.html", active="/signup", page_title="Signup")
+    return render(request, "signup.html", active="/signup", auth_not_configured=not AUTH0_CONFIGURED)
+
+
+@app.get("/signup/{account_type}")
+async def signup_start(request: Request, account_type: str):
+    if account_type not in ACCOUNT_TYPES:
+        raise HTTPException(status_code=404)
+    if not AUTH0_CONFIGURED:
+        return render(request, "signup.html", active="/signup", auth_not_configured=True)
+
+    request.session["account_type"] = ACCOUNT_TYPES[account_type]
+    redirect_uri = request.url_for("auth_callback")
+    return await oauth.auth0.authorize_redirect(request, redirect_uri, screen_hint="signup")
+
+
+@app.get("/auth/callback", name="auth_callback")
+async def auth_callback(request: Request):
+    token = await oauth.auth0.authorize_access_token(request)
+    userinfo = token.get("userinfo") or {}
+    request.session["user"] = dict(userinfo)
+    return RedirectResponse(url="/dashboard")
+
+
+@app.get("/dashboard")
+def dashboard(request: Request):
+    user = request.session.get("user")
+    account_type = request.session.get("account_type")
+    if not user or not account_type:
+        return RedirectResponse(url="/signup")
+    return templates.TemplateResponse(
+        request, "dashboard.html", {"user": user, "account_type": account_type}
+    )
 
 
 @app.get("/privacy-policy")

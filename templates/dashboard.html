@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ account_type }} — The Ritual Arc</title>
+  <link rel="stylesheet" href="/static/css/style.css" />
+</head>
+<body>
+  <div style="display: flex; justify-content: space-between; align-items: flex-start; padding: 1.5rem 2rem;">
+    <div style="font-family: 'Playfair Display', serif; font-size: 1.3rem; color: var(--accent);">
+      {{ account_type }}
+    </div>
+    <div style="text-align: right; font-size: 0.9rem; color: var(--ink-dim);">
+      Logged in as<br />
+      <strong style="color: var(--ink);">{{ user.get("name") or user.get("email") or user.get("nickname") or user.get("sub") }}</strong>
+      {% if user.get("email") and user.get("email") != (user.get("name") or user.get("email")) %}
+      <br />{{ user.get("email") }}
+      {% endif %}
+    </div>
+  </div>
+</body>
+</html>
