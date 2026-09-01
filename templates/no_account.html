@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}No Account — Ritual Arc{% endblock %}
+{% block content %}
+
+{% set display_name = user.get("name") or user.get("email") %}
+
+<section class="hero">
+  <h1>No account for</h1>
+  <p class="tagline">
+    {% if display_name and display_name != user.get("email") %}{{ display_name }} — {% endif %}{{ user.get("email") }}
+  </p>
+</section>
+
+<section>
+  <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+    <a class="button" href="/login?retry=true">Login</a>
+    <span style="color: var(--ink-dim);">Try again with a different account</span>
+  </div>
+  <div style="margin-top: 1.5rem;">
+    <a class="button" href="/signup">Signup</a>
+  </div>
+</section>
+
+{% endblock %}

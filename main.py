@@ -110,12 +110,13 @@ def contact_submit(
 
 
 @app.get("/login")
-async def login(request: Request):
+async def login(request: Request, retry: bool = False):
     if not AUTH0_CONFIGURED:
         return render(request, "coming_soon.html", active="/login", page_title="Login")
 
     redirect_uri = request.url_for("auth_callback")
-    return await oauth.auth0.authorize_redirect(request, redirect_uri)
+    kwargs = {"prompt": "login"} if retry else {}
+    return await oauth.auth0.authorize_redirect(request, redirect_uri, **kwargs)
 
 
 ACCOUNT_TYPES = {"member": "Member", "brand": "Brand"}
@@ -156,15 +157,31 @@ async def auth_callback(request: Request):
     else:
         # Login: no fresh choice was made, so look it up by (HMAC of) email instead.
         account_type = None
+        lookup_failed = False
         if email:
             try:
                 account_type = await get_account_type(email)
             except AccountStoreError:
                 logger.exception("Failed to look up account type from the database")
+                lookup_failed = True
+
+        if account_type is None and not lookup_failed:
+            # The database was reachable and simply has no row for this email:
+            # this is a genuine "you haven't signed up" case, not an outage.
+            request.session["pending_login_user"] = dict(userinfo)
+            return RedirectResponse(url="/no-account")
 
     request.session["user"] = dict(userinfo)
     request.session["account_type"] = account_type
     return RedirectResponse(url="/dashboard")
+
+
+@app.get("/no-account")
+def no_account(request: Request):
+    pending_user = request.session.get("pending_login_user")
+    if not pending_user:
+        return RedirectResponse(url="/login")
+    return render(request, "no_account.html", active="", user=pending_user)
 
 
 DASHBOARD_TABS = {"brand-profile", "product-profiles", "menu-item3", "search", "help", "inbox"}
