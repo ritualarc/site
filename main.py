@@ -3,6 +3,7 @@ import os
 import smtplib
 from contextlib import asynccontextmanager
 from pathlib import Path
+from urllib.parse import urlencode
 
 from fastapi import FastAPI, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse
@@ -11,7 +12,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
 from account_store import AccountStoreError, ensure_schema, get_account_type, save_account_type
-from auth import AUTH0_CONFIGURED, oauth
+from auth import AUTH0_CLIENT_ID, AUTH0_CONFIGURED, AUTH0_DOMAIN, oauth
 from mailer import EmailNotConfiguredError, send_contact_email
 
 logger = logging.getLogger(__name__)
@@ -166,15 +167,31 @@ async def auth_callback(request: Request):
     return RedirectResponse(url="/dashboard")
 
 
+DASHBOARD_TABS = {"brand-profile", "product-profiles", "menu-item3", "search", "help", "inbox"}
+
+
 @app.get("/dashboard")
-def dashboard(request: Request):
+def dashboard(request: Request, tab: str = "brand-profile", q: str = ""):
     user = request.session.get("user")
     if not user:
         return RedirectResponse(url="/signup")
+    if tab not in DASHBOARD_TABS:
+        tab = "brand-profile"
     account_type = request.session.get("account_type") or "Account type not set"
     return templates.TemplateResponse(
-        request, "dashboard.html", {"user": user, "account_type": account_type}
+        request,
+        "dashboard.html",
+        {"user": user, "account_type": account_type, "tab": tab, "query": q},
     )
+
+
+@app.get("/logout")
+def logout(request: Request):
+    request.session.clear()
+    if not AUTH0_CONFIGURED:
+        return RedirectResponse(url="/")
+    params = urlencode({"client_id": AUTH0_CLIENT_ID, "returnTo": str(request.base_url)})
+    return RedirectResponse(url=f"https://{AUTH0_DOMAIN}/v2/logout?{params}")
 
 
 @app.get("/privacy-policy")
