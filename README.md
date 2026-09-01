@@ -61,38 +61,53 @@ settings):
 Without `AUTH0_DOMAIN`/`AUTH0_CLIENT_ID`/`AUTH0_CLIENT_SECRET` set, `/signup` shows an "isn't
 configured yet" message and `/login` shows "Coming soon", instead of erroring out.
 
-### Remembering Member vs. Brand across logins
+### Remembering Member vs. Brand across logins: Neon database
 
 A Login click doesn't ask which account type the person is — that's only chosen once, at signup.
-To recognize returning users, the account type is written into the user's Auth0 `app_metadata` at
-signup time, then read back out of a custom ID token claim at login time. This needs two more
-pieces of one-time setup in the Auth0 dashboard:
+To recognize returning users, the account type is stored in a Postgres `users` table (`account_store.py`)
+at signup time, keyed by the user's email, and looked up again at login time.
 
-**1. A Machine-to-Machine application** (Applications → Create Application → Machine to Machine),
-authorized for the **Auth0 Management API** with the `update:users` scope. Set its credentials:
+**The data is not stored in plaintext.** On startup the server derives two 256-bit keys from a single
+`ENCRYPTION_SECRET`:
+
+- `AES key = SHA256(secret‖0x01)` — used to encrypt the account type with **AES-256-GCM**, with a
+  fresh random 12-byte IV per write (stored alongside the ciphertext).
+- `HMAC key = SHA256(secret‖0x02)` — used to compute **HMAC-SHA256(email)**. Only that HMAC is stored,
+  never the email itself; a login recomputes the same HMAC from the email Auth0 returns to find the
+  matching row. Because it's HMAC (not a plain hash), the email can't be recovered or brute-forced
+  from what's in the database without also knowing the secret.
+
+The `users` table (`email_hmac`, `account_type_ciphertext`, `account_type_iv`, timestamps) is created
+automatically on startup if it doesn't already exist.
+
+**Setup:**
+
+1. Create a Neon Postgres database — either through the [Vercel Marketplace Neon
+   integration](https://vercel.com/marketplace/neon) (which sets the connection env var for you) or
+   directly at [neon.tech](https://neon.tech). Use the **pooled** connection string (the one with
+   `-pooler` in the hostname) — it's what lets a serverless function open short-lived connections
+   without exhausting Postgres' connection limit.
+2. Set these environment variables (locally via `export`, or in Vercel's Environment Variables
+   settings):
 
 | Variable | Required | Description |
 | --- | --- | --- |
-| `AUTH0_M2M_CLIENT_ID` | yes, to persist account type | From the M2M application settings |
-| `AUTH0_M2M_CLIENT_SECRET` | yes, to persist account type | From the M2M application settings |
+| `DATABASE_URL` | yes | Neon's pooled Postgres connection string |
+| `ENCRYPTION_SECRET` | yes | A hex-encoded 256-bit (32-byte) random value — see below |
 
-Without these, signup still works and shows the right account type for that session, but a later
-Login won't be able to recover it (the dashboard falls back to "Account type not set").
+Without these set, signup still works and shows the right account type for that session, but nothing
+is persisted, so a later Login can't recover it (the dashboard falls back to "Account type not set").
 
-**2. An Auth0 Action** (Actions → Library → Build Custom → add to the **Login** flow) that copies
-`app_metadata.account_type` onto the ID token as a custom claim:
+Generate a value for it with:
 
-```js
-exports.onExecutePostLogin = async (event, api) => {
-  const namespace = "https://ritualarc.app/account_type";
-  if (event.user.app_metadata && event.user.app_metadata.account_type) {
-    api.idToken.setCustomClaim(namespace, event.user.app_metadata.account_type);
-  }
-};
+```bash
+python3 -c "import secrets; print(secrets.token_hex(32))"
 ```
 
-The namespace string must match `ACCOUNT_TYPE_CLAIM` in `auth.py` exactly — it's just an
-identifier, not a URL that needs to resolve.
+This prints a random 256-bit value as 64 hex characters — paste it directly into Vercel's Environment
+Variables (never commit it to the repo). Treat it like a password: anyone with it, plus read access to
+the database, can decrypt every stored account type. Rotating it will make existing rows
+undecryptable, since they were encrypted with the old key.
 
 ## Deploying to Vercel
 

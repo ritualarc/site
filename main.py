@@ -1,23 +1,34 @@
 import logging
 import os
 import smtplib
+from contextlib import asynccontextmanager
 from pathlib import Path
 
-import httpx
 from fastapi import FastAPI, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
-from auth import ACCOUNT_TYPE_CLAIM, AUTH0_CONFIGURED, ManagementAPIError, oauth, set_account_type
+from account_store import AccountStoreError, ensure_schema, get_account_type, save_account_type
+from auth import AUTH0_CONFIGURED, oauth
 from mailer import EmailNotConfiguredError, send_contact_email
 
 logger = logging.getLogger(__name__)
 
 BASE_DIR = Path(__file__).resolve().parent
 
-app = FastAPI(title="Ritual Arc")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    try:
+        await ensure_schema()
+    except AccountStoreError:
+        logger.exception("Failed to ensure database schema on startup")
+    yield
+
+
+app = FastAPI(title="Ritual Arc", lifespan=lifespan)
 
 app.add_middleware(
     SessionMiddleware,
@@ -130,19 +141,25 @@ async def signup_start(request: Request, account_type: str):
 async def auth_callback(request: Request):
     token = await oauth.auth0.authorize_access_token(request)
     userinfo = token.get("userinfo") or {}
+    email = userinfo.get("email")
 
-    # Signup: this browser just chose Member/Brand, so persist it to Auth0 and use it directly.
+    # Signup: this browser just chose Member/Brand, so persist it to the database and use it directly.
     chosen_account_type = request.session.pop("pending_account_type", None)
     if chosen_account_type:
-        try:
-            await set_account_type(userinfo["sub"], chosen_account_type)
-        except (ManagementAPIError, httpx.HTTPError):
-            logger.exception("Failed to persist account type to Auth0")
+        if email:
+            try:
+                await save_account_type(email, chosen_account_type)
+            except AccountStoreError:
+                logger.exception("Failed to persist account type to the database")
         account_type = chosen_account_type
     else:
-        # Login: no fresh choice was made, so recover it from the custom ID token
-        # claim an Auth0 Action copies from the user's app_metadata (see README).
-        account_type = userinfo.get(ACCOUNT_TYPE_CLAIM)
+        # Login: no fresh choice was made, so look it up by (HMAC of) email instead.
+        account_type = None
+        if email:
+            try:
+                account_type = await get_account_type(email)
+            except AccountStoreError:
+                logger.exception("Failed to look up account type from the database")
 
     request.session["user"] = dict(userinfo)
     request.session["account_type"] = account_type
