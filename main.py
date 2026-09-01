@@ -184,7 +184,7 @@ def no_account(request: Request):
     return render(request, "no_account.html", active="", user=pending_user)
 
 
-DASHBOARD_TABS = {"brand-profile", "product-profiles", "intelligence", "search", "help", "inbox"}
+DASHBOARD_TABS = {"brand-profile", "ai-magic", "product-profiles", "intelligence", "search", "help", "inbox"}
 
 
 @app.get("/dashboard")
