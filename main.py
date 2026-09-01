@@ -11,7 +11,14 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
-from account_store import AccountStoreError, ensure_schema, get_account_type, save_account_type
+from account_store import (
+    AccountStoreError,
+    ensure_schema,
+    get_account_type,
+    get_brand_profile,
+    save_account_type,
+    save_brand_profile,
+)
 from auth import AUTH0_CLIENT_ID, AUTH0_CONFIGURED, AUTH0_DOMAIN, oauth
 from mailer import EmailNotConfiguredError, send_contact_email
 
@@ -184,22 +191,79 @@ def no_account(request: Request):
     return render(request, "no_account.html", active="", user=pending_user)
 
 
-DASHBOARD_TABS = {"brand-profile", "ai-magic", "product-profiles", "intelligence", "search", "help", "inbox"}
+DASHBOARD_TABS = {
+    "brand-profile",
+    "ai-magic",
+    "manual-enrol",
+    "product-profiles",
+    "intelligence",
+    "search",
+    "help",
+    "inbox",
+}
+
+BRAND_PROFILE_FIELDS = [
+    ("website_url", "URL of website"),
+    ("market_positioning", "Overall market positioning"),
+    ("brand_proposition", "Brand proposition"),
+    ("aesthetic_positioning", "Aesthetic positioning"),
+    ("cultural_lifestyle_positioning", "Cultural or lifestyle positioning"),
+    ("fashion_trend_longevity", "Relationship to fashion, trend and/or longevity"),
+    ("accessibility_exclusivity", "Accessibility or exclusivity"),
+    ("differentiation", "Points of differentiation"),
+    ("competitive_landscape", "Perceived competitive landscape"),
+]
 
 
 @app.get("/dashboard")
-def dashboard(request: Request, tab: str = "brand-profile", q: str = ""):
+async def dashboard(request: Request, tab: str = "brand-profile", q: str = ""):
     user = request.session.get("user")
     if not user:
         return RedirectResponse(url="/signup")
     if tab not in DASHBOARD_TABS:
         tab = "brand-profile"
     account_type = request.session.get("account_type") or "Account type not set"
+
+    brand_profile = None
+    if tab == "brand-profile":
+        email = user.get("email")
+        if email:
+            try:
+                brand_profile = await get_brand_profile(email)
+            except AccountStoreError:
+                logger.exception("Failed to load brand profile")
+
     return templates.TemplateResponse(
         request,
         "dashboard.html",
-        {"user": user, "account_type": account_type, "tab": tab, "query": q},
+        {
+            "user": user,
+            "account_type": account_type,
+            "tab": tab,
+            "query": q,
+            "brand_profile": brand_profile,
+            "brand_profile_fields": BRAND_PROFILE_FIELDS,
+        },
     )
+
+
+@app.post("/dashboard/brand-profile")
+async def save_brand_profile_form(request: Request):
+    user = request.session.get("user")
+    if not user:
+        return RedirectResponse(url="/signup")
+
+    email = user.get("email")
+    form = await request.form()
+    profile = {key: str(form.get(key, ""))[:300] for key, _label in BRAND_PROFILE_FIELDS}
+
+    if email:
+        try:
+            await save_brand_profile(email, profile)
+        except AccountStoreError:
+            logger.exception("Failed to save brand profile")
+
+    return RedirectResponse(url="/dashboard?tab=brand-profile", status_code=303)
 
 
 @app.get("/logout")

@@ -1,5 +1,6 @@
 import hashlib
 import hmac
+import json
 import os
 
 import asyncpg
@@ -67,6 +68,16 @@ async def ensure_schema() -> None:
             )
             """
         )
+        await conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS brand_profiles (
+                email_hmac BYTEA PRIMARY KEY,
+                data BYTEA NOT NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+            )
+            """
+        )
     finally:
         await conn.close()
 
@@ -123,3 +134,59 @@ async def get_account_type(email: str) -> str | None:
     except Exception as exc:
         raise AccountStoreError(f"Failed to decrypt account type: {exc}") from exc
     return plaintext.decode("utf-8")
+
+
+async def save_brand_profile(email: str, profile: dict) -> None:
+    """Save an arbitrary dict of brand profile fields as a single encrypted blob.
+
+    Encoded as JSON before encryption, so new fields can be added later without
+    a schema change or migration — old rows simply won't have the new keys.
+    """
+    aes_key, hmac_key = _derive_keys()
+    email_hmac = _hmac_email(email, hmac_key)
+
+    iv = os.urandom(12)
+    plaintext = json.dumps(profile).encode("utf-8")
+    ciphertext = AESGCM(aes_key).encrypt(iv, plaintext, None)
+    blob = iv + ciphertext
+
+    conn = await _connect()
+    try:
+        await conn.execute(
+            """
+            INSERT INTO brand_profiles (email_hmac, data)
+            VALUES ($1, $2)
+            ON CONFLICT (email_hmac)
+            DO UPDATE SET data = EXCLUDED.data, updated_at = now()
+            """,
+            email_hmac,
+            blob,
+        )
+    except asyncpg.PostgresError as exc:
+        raise AccountStoreError(f"Failed to save brand profile: {exc}") from exc
+    finally:
+        await conn.close()
+
+
+async def get_brand_profile(email: str) -> dict | None:
+    aes_key, hmac_key = _derive_keys()
+    email_hmac = _hmac_email(email, hmac_key)
+
+    conn = await _connect()
+    try:
+        row = await conn.fetchrow("SELECT data FROM brand_profiles WHERE email_hmac = $1", email_hmac)
+    except asyncpg.PostgresError as exc:
+        raise AccountStoreError(f"Failed to look up brand profile: {exc}") from exc
+    finally:
+        await conn.close()
+
+    if row is None:
+        return None
+
+    blob = bytes(row["data"])
+    iv, ciphertext = blob[:12], blob[12:]
+    try:
+        plaintext = AESGCM(aes_key).decrypt(iv, ciphertext, None)
+        return json.loads(plaintext.decode("utf-8"))
+    except Exception as exc:
+        raise AccountStoreError(f"Failed to decrypt brand profile: {exc}") from exc

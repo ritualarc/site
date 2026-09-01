@@ -249,6 +249,50 @@
       color: #8a8378;
     }
 
+    .app-content .field-label {
+      display: block;
+      color: var(--ink);
+      font-size: 0.9rem;
+      margin-bottom: 0.35rem;
+    }
+
+    .app-content .text-area {
+      display: block;
+      width: 100%;
+      max-width: 520px;
+      background: #ece7dd;
+      color: #1a1a1a;
+      border: none;
+      border-radius: 3px;
+      padding: 0.7rem 1rem;
+      font-size: 0.95rem;
+      font-family: inherit;
+      margin: 0 0 1.25rem;
+      resize: vertical;
+      white-space: pre-wrap;
+      overflow-wrap: break-word;
+    }
+
+    .app-content .profile-field {
+      margin-bottom: 1.25rem;
+      max-width: 520px;
+    }
+
+    .app-content .profile-field-label {
+      color: var(--accent);
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 0.3rem;
+    }
+
+    .app-content .profile-field-value {
+      color: var(--ink);
+      font-size: 1rem;
+      white-space: pre-wrap;
+      overflow-wrap: break-word;
+    }
+
     .app-info {
       width: 320px;
       max-width: 100%;
@@ -290,7 +334,7 @@
       <div class="email">{{ user.get("email") }}</div>
     </div>
     <div class="tab-group">
-      <a class="tab-button{% if tab in ('brand-profile', 'ai-magic') %} active{% endif %}" href="/dashboard?tab=brand-profile">Brand Profile</a>
+      <a class="tab-button{% if tab in ('brand-profile', 'ai-magic', 'manual-enrol') %} active{% endif %}" href="/dashboard?tab=brand-profile">Brand Profile</a>
       <a class="tab-button{% if tab == 'product-profiles' %} active{% endif %}" href="/dashboard?tab=product-profiles">Product Profiles</a>
       <a class="tab-button{% if tab == 'intelligence' %} active{% endif %}" href="/dashboard?tab=intelligence">Intelligence</a>
     </div>
@@ -303,10 +347,20 @@
   <div class="app-body">
     <div class="app-content">
       {% if tab == "brand-profile" %}
-      <div class="enrol-buttons">
-        <a class="enrol" href="/dashboard?tab=ai-magic">Enrol Brand using AI Magic</a>
-        <button type="button" class="enrol">Enrol Brand Manually</button>
-      </div>
+        {% if brand_profile %}
+        <h2 class="tab-title">Brand Profile</h2>
+        {% for key, label in brand_profile_fields %}
+        <div class="profile-field">
+          <div class="profile-field-label">{{ label }}</div>
+          <div class="profile-field-value">{{ brand_profile.get(key) or "—" }}</div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="enrol-buttons">
+          <a class="enrol" href="/dashboard?tab=ai-magic">Enrol Brand using AI Magic</a>
+          <a class="enrol" href="/dashboard?tab=manual-enrol">Enrol Brand Manually</a>
+        </div>
+        {% endif %}
       {% elif tab == "ai-magic" %}
       <h2 class="tab-title">Enrol Brand using AI Magic</h2>
       <p>Let me infer your brand profile from your brand's website. Please enter the URL of your website:</p>
@@ -315,6 +369,19 @@
         <button type="button" class="enrol">Begin Analysis</button>
         <a class="button" href="/dashboard?tab=brand-profile">Cancel</a>
       </div>
+      {% elif tab == "manual-enrol" %}
+      <h2 class="tab-title">Enrol Brand Manually</h2>
+      <p>Please enter information about your brand.</p>
+      <form method="post" action="/dashboard/brand-profile">
+        {% for key, label in brand_profile_fields %}
+        <label class="field-label" for="{{ key }}">{{ label }}</label>
+        <textarea class="text-area" id="{{ key }}" name="{{ key }}" maxlength="300" rows="2"></textarea>
+        {% endfor %}
+        <div class="enrol-buttons">
+          <button type="submit" class="enrol">Save</button>
+          <a class="button" href="/dashboard?tab=brand-profile">Cancel</a>
+        </div>
+      </form>
       {% elif tab == "product-profiles" %}
       <p>Please enrol the brand before products.</p>
       {% elif tab == "intelligence" %}
