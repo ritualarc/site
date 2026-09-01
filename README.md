@@ -31,12 +31,12 @@ Variables settings):
 Without `SMTP_USERNAME`/`SMTP_PASSWORD` set, submissions fail gracefully with an on-page error message
 instead of pretending to succeed.
 
-## Signup / Auth0
+## Signup / Login / Auth0
 
-The two buttons on `/signup` ("Customer" and "Company") each start an Auth0 Universal Login signup
-flow (`auth.py` + the `/signup/{account_type}` and `/auth/callback` routes in `main.py`), then land on
-a bare `/dashboard` page showing the chosen account type top-left and "Logged in as" (name/email)
-top-right.
+The two buttons on `/signup` ("Member" and "Brand") each start an Auth0 Universal Login **signup**
+flow. `/login` starts an Auth0 Universal Login **login** flow. Both use the same
+`/auth/callback` route and land on the same bare `/dashboard` page, showing the account type
+top-left and "Logged in as" (name/email) top-right.
 
 Auth0 is set up as a **Regular Web Application** (server-side Authorization Code flow — this app
 renders pages server-side, so it needs a confidential client that can hold a client secret, not a
@@ -59,7 +59,40 @@ settings):
 | `SESSION_SECRET_KEY` | yes in production | Random secret used to sign the session cookie; without it a hardcoded dev default is used |
 
 Without `AUTH0_DOMAIN`/`AUTH0_CLIENT_ID`/`AUTH0_CLIENT_SECRET` set, `/signup` shows an "isn't
-configured yet" message instead of the buttons erroring out.
+configured yet" message and `/login` shows "Coming soon", instead of erroring out.
+
+### Remembering Member vs. Brand across logins
+
+A Login click doesn't ask which account type the person is — that's only chosen once, at signup.
+To recognize returning users, the account type is written into the user's Auth0 `app_metadata` at
+signup time, then read back out of a custom ID token claim at login time. This needs two more
+pieces of one-time setup in the Auth0 dashboard:
+
+**1. A Machine-to-Machine application** (Applications → Create Application → Machine to Machine),
+authorized for the **Auth0 Management API** with the `update:users` scope. Set its credentials:
+
+| Variable | Required | Description |
+| --- | --- | --- |
+| `AUTH0_M2M_CLIENT_ID` | yes, to persist account type | From the M2M application settings |
+| `AUTH0_M2M_CLIENT_SECRET` | yes, to persist account type | From the M2M application settings |
+
+Without these, signup still works and shows the right account type for that session, but a later
+Login won't be able to recover it (the dashboard falls back to "Account type not set").
+
+**2. An Auth0 Action** (Actions → Library → Build Custom → add to the **Login** flow) that copies
+`app_metadata.account_type` onto the ID token as a custom claim:
+
+```js
+exports.onExecutePostLogin = async (event, api) => {
+  const namespace = "https://ritualarc.app/account_type";
+  if (event.user.app_metadata && event.user.app_metadata.account_type) {
+    api.idToken.setCustomClaim(namespace, event.user.app_metadata.account_type);
+  }
+};
+```
+
+The namespace string must match `ACCOUNT_TYPE_CLAIM` in `auth.py` exactly — it's just an
+identifier, not a URL that needs to resolve.
 
 ## Deploying to Vercel
 

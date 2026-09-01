@@ -3,13 +3,14 @@ import os
 import smtplib
 from pathlib import Path
 
+import httpx
 from fastapi import FastAPI, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
-from auth import AUTH0_CONFIGURED, oauth
+from auth import ACCOUNT_TYPE_CLAIM, AUTH0_CONFIGURED, ManagementAPIError, oauth, set_account_type
 from mailer import EmailNotConfiguredError, send_contact_email
 
 logger = logging.getLogger(__name__)
@@ -97,8 +98,12 @@ def contact_submit(
 
 
 @app.get("/login")
-def login(request: Request):
-    return render(request, "coming_soon.html", active="/login", page_title="Login")
+async def login(request: Request):
+    if not AUTH0_CONFIGURED:
+        return render(request, "coming_soon.html", active="/login", page_title="Login")
+
+    redirect_uri = request.url_for("auth_callback")
+    return await oauth.auth0.authorize_redirect(request, redirect_uri)
 
 
 ACCOUNT_TYPES = {"member": "Member", "brand": "Brand"}
@@ -116,7 +121,7 @@ async def signup_start(request: Request, account_type: str):
     if not AUTH0_CONFIGURED:
         return render(request, "signup.html", active="/signup", auth_not_configured=True)
 
-    request.session["account_type"] = ACCOUNT_TYPES[account_type]
+    request.session["pending_account_type"] = ACCOUNT_TYPES[account_type]
     redirect_uri = request.url_for("auth_callback")
     return await oauth.auth0.authorize_redirect(request, redirect_uri, screen_hint="signup")
 
@@ -125,16 +130,31 @@ async def signup_start(request: Request, account_type: str):
 async def auth_callback(request: Request):
     token = await oauth.auth0.authorize_access_token(request)
     userinfo = token.get("userinfo") or {}
+
+    # Signup: this browser just chose Member/Brand, so persist it to Auth0 and use it directly.
+    chosen_account_type = request.session.pop("pending_account_type", None)
+    if chosen_account_type:
+        try:
+            await set_account_type(userinfo["sub"], chosen_account_type)
+        except (ManagementAPIError, httpx.HTTPError):
+            logger.exception("Failed to persist account type to Auth0")
+        account_type = chosen_account_type
+    else:
+        # Login: no fresh choice was made, so recover it from the custom ID token
+        # claim an Auth0 Action copies from the user's app_metadata (see README).
+        account_type = userinfo.get(ACCOUNT_TYPE_CLAIM)
+
     request.session["user"] = dict(userinfo)
+    request.session["account_type"] = account_type
     return RedirectResponse(url="/dashboard")
 
 
 @app.get("/dashboard")
 def dashboard(request: Request):
     user = request.session.get("user")
-    account_type = request.session.get("account_type")
-    if not user or not account_type:
+    if not user:
         return RedirectResponse(url="/signup")
+    account_type = request.session.get("account_type") or "Account type not set"
     return templates.TemplateResponse(
         request, "dashboard.html", {"user": user, "account_type": account_type}
     )
