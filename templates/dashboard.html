@@ -375,11 +375,16 @@
       {% elif tab == "ai-magic" %}
       <h2 class="tab-title">Enrol Brand using AI Magic</h2>
       <p>Let me infer your brand profile from your brand's website. Please enter the URL of your website:</p>
-      <input type="text" class="text-input" placeholder="brand.com" />
-      <div class="enrol-buttons">
-        <button type="button" class="enrol">Begin Analysis</button>
-        <a class="button" href="/dashboard?tab=brand-profile">Cancel</a>
-      </div>
+      {% if ai_error %}
+      <p style="color: #e07a7a;">{{ ai_error }}</p>
+      {% endif %}
+      <form method="post" action="/dashboard/brand-profile/ai-analysis">
+        <input type="text" class="text-input" name="url" placeholder="brand.com" value="{{ ai_magic_url or '' }}" />
+        <div class="enrol-buttons">
+          <button type="submit" class="enrol">Begin Analysis</button>
+          <a class="button" href="/dashboard?tab=brand-profile">Cancel</a>
+        </div>
+      </form>
       {% elif tab == "manual-enrol" %}
       <h2 class="tab-title">Enrol Brand Manually</h2>
       <p>Please enter information about your brand.</p>

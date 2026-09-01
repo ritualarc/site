@@ -20,6 +20,7 @@ from account_store import (
     save_account_type,
     save_brand_profile,
 )
+from ai_analysis import AI_ANALYSIS_CONFIGURED, AIAnalysisError, analyze_brand_website, fetch_website_text
 from auth import AUTH0_CLIENT_ID, AUTH0_CONFIGURED, AUTH0_DOMAIN, oauth
 from mailer import EmailNotConfiguredError, send_contact_email
 
@@ -266,6 +267,47 @@ async def save_brand_profile_form(request: Request):
             logger.exception("Failed to save brand profile")
 
     return RedirectResponse(url="/dashboard?tab=brand-profile", status_code=303)
+
+
+@app.post("/dashboard/brand-profile/ai-analysis")
+async def brand_profile_ai_analysis(request: Request):
+    user = request.session.get("user")
+    if not user:
+        return RedirectResponse(url="/signup")
+
+    form = await request.form()
+    url = str(form.get("url", "")).strip()
+
+    account_type = request.session.get("account_type") or "Account type not set"
+    context = {
+        "user": user,
+        "account_type": account_type,
+        "tab": "ai-magic",
+        "query": "",
+        "brand_profile_fields": BRAND_PROFILE_FIELDS,
+        "ai_magic_url": url,
+    }
+
+    if not url:
+        context["ai_error"] = "Please enter a website URL."
+        return templates.TemplateResponse(request, "dashboard.html", context)
+
+    if not AI_ANALYSIS_CONFIGURED:
+        context["ai_error"] = "AI analysis isn't configured yet."
+        return templates.TemplateResponse(request, "dashboard.html", context)
+
+    try:
+        page_text = await fetch_website_text(url)
+        profile = await analyze_brand_website(url, page_text, BRAND_PROFILE_FIELDS)
+    except AIAnalysisError:
+        logger.exception("AI brand analysis failed")
+        context["ai_error"] = "Could not analyze that website. Please check the URL and try again."
+        return templates.TemplateResponse(request, "dashboard.html", context)
+
+    # Show the AI's answers in the editable manual-entry form for review before saving.
+    context["tab"] = "manual-enrol"
+    context["brand_profile"] = profile
+    return templates.TemplateResponse(request, "dashboard.html", context)
 
 
 @app.post("/dashboard/brand-profile/delete")
