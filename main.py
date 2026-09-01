@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 BASE_DIR = Path(__file__).resolve().parent
 
-app = FastAPI(title="The Ritual Arc")
+app = FastAPI(title="Ritual Arc")
 
 app.add_middleware(
     SessionMiddleware,

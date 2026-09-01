@@ -1,6 +1,6 @@
-# The Ritual Arc
+# Ritual Arc
 
-A FastAPI website for The Ritual Arc, deployed on Vercel. Initial content is adapted from
+A FastAPI website for Ritual Arc, deployed on Vercel. Initial content is adapted from
 [theritualarc.wixsite.com/theritualarc](https://theritualarc.wixsite.com/theritualarc).
 
 ## Local development

@@ -64,10 +64,9 @@ a:hover {
 }
 
 .wordmark {
-  font-family: "Playfair Display", serif;
+  font-family: Verdana, Geneva, "Segoe UI", Arial, sans-serif;
   font-size: 1.25rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  letter-spacing: 0.02em;
   color: var(--ink);
 }
 
