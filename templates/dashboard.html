@@ -221,6 +221,12 @@
       opacity: 0.9;
     }
 
+    .app-content button.button {
+      background: transparent;
+      font-family: inherit;
+      cursor: pointer;
+    }
+
     .app-content p {
       color: var(--ink-dim);
       font-size: 1.05rem;
@@ -334,7 +340,7 @@
       <div class="email">{{ user.get("email") }}</div>
     </div>
     <div class="tab-group">
-      <a class="tab-button{% if tab in ('brand-profile', 'ai-magic', 'manual-enrol') %} active{% endif %}" href="/dashboard?tab=brand-profile">Brand Profile</a>
+      <a class="tab-button{% if tab in ('brand-profile', 'ai-magic', 'manual-enrol', 'delete-profile-confirm') %} active{% endif %}" href="/dashboard?tab=brand-profile">Brand Profile</a>
       <a class="tab-button{% if tab == 'product-profiles' %} active{% endif %}" href="/dashboard?tab=product-profiles">Product Profiles</a>
       <a class="tab-button{% if tab == 'intelligence' %} active{% endif %}" href="/dashboard?tab=intelligence">Intelligence</a>
     </div>
@@ -355,6 +361,11 @@
           <div class="profile-field-value">{{ brand_profile.get(key) or "—" }}</div>
         </div>
         {% endfor %}
+        <div class="enrol-buttons" style="margin-top: 1.5rem;">
+          <a class="button" href="/dashboard?tab=manual-enrol">Edit</a>
+          <a class="button" href="/dashboard?tab=delete-profile-confirm">Reset</a>
+          <button type="button" class="button">AI Analysis</button>
+        </div>
         {% else %}
         <div class="enrol-buttons">
           <a class="enrol" href="/dashboard?tab=ai-magic">Enrol Brand using AI Magic</a>
@@ -375,13 +386,21 @@
       <form method="post" action="/dashboard/brand-profile">
         {% for key, label in brand_profile_fields %}
         <label class="field-label" for="{{ key }}">{{ label }}</label>
-        <textarea class="text-area" id="{{ key }}" name="{{ key }}" maxlength="300" rows="2"></textarea>
+        <textarea class="text-area" id="{{ key }}" name="{{ key }}" maxlength="300" rows="2">{{ brand_profile.get(key) if brand_profile else "" }}</textarea>
         {% endfor %}
         <div class="enrol-buttons">
           <button type="submit" class="enrol">Save</button>
           <a class="button" href="/dashboard?tab=brand-profile">Cancel</a>
         </div>
       </form>
+      {% elif tab == "delete-profile-confirm" %}
+      <h2 class="tab-title">Delete brand profile?</h2>
+      <div class="enrol-buttons">
+        <form method="post" action="/dashboard/brand-profile/delete">
+          <button type="submit" class="enrol">Yes</button>
+        </form>
+        <a class="button" href="/dashboard?tab=brand-profile">No</a>
+      </div>
       {% elif tab == "product-profiles" %}
       <p>Please enrol the brand before products.</p>
       {% elif tab == "intelligence" %}

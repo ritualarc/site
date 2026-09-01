@@ -13,6 +13,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from account_store import (
     AccountStoreError,
+    delete_brand_profile,
     ensure_schema,
     get_account_type,
     get_brand_profile,
@@ -195,6 +196,7 @@ DASHBOARD_TABS = {
     "brand-profile",
     "ai-magic",
     "manual-enrol",
+    "delete-profile-confirm",
     "product-profiles",
     "intelligence",
     "search",
@@ -225,7 +227,7 @@ async def dashboard(request: Request, tab: str = "brand-profile", q: str = ""):
     account_type = request.session.get("account_type") or "Account type not set"
 
     brand_profile = None
-    if tab == "brand-profile":
+    if tab in ("brand-profile", "manual-enrol"):
         email = user.get("email")
         if email:
             try:
@@ -262,6 +264,22 @@ async def save_brand_profile_form(request: Request):
             await save_brand_profile(email, profile)
         except AccountStoreError:
             logger.exception("Failed to save brand profile")
+
+    return RedirectResponse(url="/dashboard?tab=brand-profile", status_code=303)
+
+
+@app.post("/dashboard/brand-profile/delete")
+async def delete_brand_profile_form(request: Request):
+    user = request.session.get("user")
+    if not user:
+        return RedirectResponse(url="/signup")
+
+    email = user.get("email")
+    if email:
+        try:
+            await delete_brand_profile(email)
+        except AccountStoreError:
+            logger.exception("Failed to delete brand profile")
 
     return RedirectResponse(url="/dashboard?tab=brand-profile", status_code=303)
 

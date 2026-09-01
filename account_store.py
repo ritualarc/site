@@ -190,3 +190,16 @@ async def get_brand_profile(email: str) -> dict | None:
         return json.loads(plaintext.decode("utf-8"))
     except Exception as exc:
         raise AccountStoreError(f"Failed to decrypt brand profile: {exc}") from exc
+
+
+async def delete_brand_profile(email: str) -> None:
+    _, hmac_key = _derive_keys()
+    email_hmac = _hmac_email(email, hmac_key)
+
+    conn = await _connect()
+    try:
+        await conn.execute("DELETE FROM brand_profiles WHERE email_hmac = $1", email_hmac)
+    except asyncpg.PostgresError as exc:
+        raise AccountStoreError(f"Failed to delete brand profile: {exc}") from exc
+    finally:
+        await conn.close()
