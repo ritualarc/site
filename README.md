@@ -108,21 +108,26 @@ undecryptable, since they were encrypted with the old key.
 
 ## AI brand analysis (Vercel AI Gateway)
 
-"Enrol Brand using AI Magic" (`/dashboard?tab=ai-magic`) fetches the submitted website, strips it down
-to plain text, and asks an LLM — via the [Vercel AI Gateway](https://vercel.com/docs/ai-gateway)'s
-OpenAI-compatible endpoint (`ai_analysis.py`) — to infer answers to the same fields as the manual
-enrolment form. Results land back in that form (not saved yet) so they can be reviewed or edited before
-clicking Save.
+"Enrol Brand" (`/dashboard?tab=ai-magic`) fetches the submitted website, strips it down to plain text,
+and asks an LLM — via [LangChain](https://python.langchain.com/) (`langchain-openai`'s `ChatOpenAI`)
+pointed at the [Vercel AI Gateway](https://vercel.com/docs/ai-gateway)'s OpenAI-compatible endpoint
+(`ai_analysis.py`) — to infer answers to the same fields as the manual enrolment form. The whole thing
+then auto-saves and lands on the finished profile screen with no extra clicks.
 
 | Variable | Required | Description |
 | --- | --- | --- |
 | `AI_GATEWAY_API_KEY` | yes | An [AI Gateway API key](https://vercel.com/docs/ai-gateway/authentication-and-byok/api-keys) |
-| `AI_MODEL` | yes | A Gateway model id, e.g. `anthropic/claude-opus-5` or `openai/gpt-5.6-sol` |
+| `AI_MODEL` | yes | The primary Gateway model id, e.g. `anthropic/claude-opus-5` or `openai/gpt-5.6-sol` |
+| `AI_MODEL_FALLBACK` | no | A second Gateway model id. If a call to `AI_MODEL` fails, LangChain automatically retries the same request against this model before giving up. |
 
-Without both set, "Begin Analysis" shows an "isn't configured yet" message instead of erroring out. A
-failed fetch or a model response that isn't valid JSON also degrades to an on-page error rather than a
-crash — parsing is deliberately lenient (missing fields default to an empty string) since not every
-model will honor the requested shape exactly, and this list of fields may grow later.
+Without `AI_GATEWAY_API_KEY`/`AI_MODEL` set, "Begin Analysis" shows an "isn't configured yet" message
+instead of erroring out. A failed fetch, a total failure of both the primary and fallback model, or a
+model response that isn't valid JSON all degrade to an on-page error rather than a crash — parsing is
+deliberately lenient (missing fields default to an empty string) since not every model will honor the
+requested shape exactly, and this list of fields may grow later.
+
+Whichever model actually served each request (primary or fallback) is logged as `AI brand analysis
+served by model: <model id>`, read from the API response itself rather than assumed from config.
 
 ## Deploying to Vercel
 

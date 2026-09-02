@@ -1,21 +1,53 @@
 import html
 import json
+import logging
 import os
 import re
 
 import httpx
-from openai import AsyncOpenAI, OpenAIError
+from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_openai import ChatOpenAI
+
+logger = logging.getLogger(__name__)
 
 AI_GATEWAY_API_KEY = os.environ.get("AI_GATEWAY_API_KEY")
 AI_MODEL = os.environ.get("AI_MODEL")
+AI_MODEL_FALLBACK = os.environ.get("AI_MODEL_FALLBACK")
 
 AI_ANALYSIS_CONFIGURED = bool(AI_GATEWAY_API_KEY and AI_MODEL)
 
-_client = (
-    AsyncOpenAI(api_key=AI_GATEWAY_API_KEY, base_url="https://ai-gateway.vercel.sh/v1", timeout=90)
-    if AI_ANALYSIS_CONFIGURED
-    else None
-)
+_GATEWAY_BASE_URL = "https://ai-gateway.vercel.sh/v1"
+
+
+def _build_chat_model():
+    """Build the LangChain chat model, with AI_MODEL_FALLBACK wired in as a fallback.
+
+    If the primary model call raises, LangChain automatically retries the same
+    request against the fallback model before giving up.
+    """
+    if not AI_ANALYSIS_CONFIGURED:
+        return None
+
+    primary = ChatOpenAI(
+        model=AI_MODEL,
+        api_key=AI_GATEWAY_API_KEY,
+        base_url=_GATEWAY_BASE_URL,
+        timeout=90,
+    )
+
+    if not AI_MODEL_FALLBACK:
+        return primary
+
+    fallback = ChatOpenAI(
+        model=AI_MODEL_FALLBACK,
+        api_key=AI_GATEWAY_API_KEY,
+        base_url=_GATEWAY_BASE_URL,
+        timeout=90,
+    )
+    return primary.with_fallbacks([fallback])
+
+
+_chat_model = _build_chat_model()
 
 
 class AIAnalysisError(RuntimeError):
@@ -90,20 +122,23 @@ async def analyze_brand_website(url: str, page_text: str, fields: list[tuple[str
     )
 
     try:
-        response = await _client.chat.completions.create(
-            model=AI_MODEL,
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are a precise brand analyst. Respond with ONLY a single valid JSON object — no markdown, no commentary.",
-                },
-                {"role": "user", "content": prompt},
-            ],
+        response = await _chat_model.ainvoke(
+            [
+                SystemMessage(
+                    content="You are a precise brand analyst. Respond with ONLY a single valid JSON object — no markdown, no commentary."
+                ),
+                HumanMessage(content=prompt),
+            ]
         )
-    except OpenAIError as exc:
+    except Exception as exc:
         raise AIAnalysisError(f"AI analysis request failed: {exc}") from exc
 
-    raw = (response.choices[0].message.content or "") if response.choices else ""
+    model_used = (response.response_metadata or {}).get("model_name") or (response.response_metadata or {}).get(
+        "model"
+    )
+    logger.info("AI brand analysis served by model: %s", model_used or "unknown")
+
+    raw = response.content or ""
     data = _parse_json_object(raw)
 
     profile = {key: str(data.get(key) or "")[:300] for key, _label in fields_to_infer}
