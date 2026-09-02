@@ -308,6 +308,10 @@
       margin-bottom: 0.3rem;
     }
 
+    .app-content .tone-chosen {
+      font-size: 1.2em;
+    }
+
     .app-content .profile-field-value {
       color: var(--ink);
       font-size: 1rem;
@@ -464,7 +468,7 @@
           {% if tone_of_voice_keys and key in tone_of_voice_keys %}
           {% set tone = format_tone_field(brand_profile.get(key), brand_profile_field_labels.get(key, key)) %}
           <div class="profile-field-label">
-            {% for word, chosen in tone.words %}{% if chosen %}<strong>{{ word }}</strong>{% else %}{{ word }}{% endif %}{% if not loop.last %} / {% endif %}{% endfor %}
+            {% for word, chosen in tone.words %}{% if chosen %}<strong class="tone-chosen">{{ word }}</strong>{% else %}{{ word }}{% endif %}{% if not loop.last %} / {% endif %}{% endfor %}
           </div>
           <div class="profile-field-value">{{ tone.value_text }}</div>
           {% else %}

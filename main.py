@@ -212,7 +212,6 @@ TONE_OF_VOICE_FIELDS = [
     ("aspirational_accessible", "Aspirational / Accessible"),
     ("direct_narrative", "Direct / Narrative"),
     ("emotional_functional", "Emotional / Functional"),
-    ("community_led_authoritative", "Community-led / Authoritative"),
 ]
 
 def _format_tone_field(value: str, label: str) -> dict:
