@@ -299,6 +299,67 @@
       overflow-wrap: break-word;
     }
 
+    .robot-loading {
+      max-width: 520px;
+    }
+
+    .robot-lane {
+      position: relative;
+      height: 90px;
+      overflow: hidden;
+      margin: 1.5rem 0 0.5rem;
+    }
+
+    .robot-walker {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 64px;
+      height: 80px;
+      animation: robot-walk 4s ease-in-out infinite;
+    }
+
+    .robot-bob {
+      animation: robot-bob 0.35s ease-in-out infinite alternate;
+    }
+
+    .loading-caption {
+      color: var(--ink-dim);
+      font-style: italic;
+    }
+
+    @keyframes robot-walk {
+      0% {
+        left: 0%;
+        transform: scaleX(1);
+      }
+      47% {
+        left: calc(100% - 64px);
+        transform: scaleX(1);
+      }
+      50% {
+        left: calc(100% - 64px);
+        transform: scaleX(-1);
+      }
+      97% {
+        left: 0%;
+        transform: scaleX(-1);
+      }
+      100% {
+        left: 0%;
+        transform: scaleX(1);
+      }
+    }
+
+    @keyframes robot-bob {
+      from {
+        transform: translateY(0);
+      }
+      to {
+        transform: translateY(-4px);
+      }
+    }
+
     .app-info {
       width: 320px;
       max-width: 100%;
@@ -378,13 +439,55 @@
       {% if ai_error %}
       <p style="color: #e07a7a;">{{ ai_error }}</p>
       {% endif %}
-      <form method="post" action="/dashboard/brand-profile/ai-analysis">
+      <form method="post" action="/dashboard/brand-profile/ai-analysis" id="ai-magic-form">
         <input type="text" class="text-input" name="url" placeholder="brand.com" value="{{ ai_magic_url or '' }}" />
         <div class="enrol-buttons">
           <button type="submit" class="enrol">Begin Analysis</button>
           <a class="button" href="/dashboard?tab=brand-profile">Cancel</a>
         </div>
       </form>
+
+      <div id="ai-magic-loading" class="robot-loading" hidden>
+        <div class="robot-lane">
+          <div class="robot-walker">
+            <div class="robot-bob">
+              <svg viewBox="0 0 64 80" xmlns="http://www.w3.org/2000/svg" width="64" height="80">
+                <line x1="32" y1="4" x2="32" y2="14" stroke="#c9a25b" stroke-width="2" />
+                <circle cx="32" cy="4" r="3" fill="#c9a25b" />
+                <rect x="16" y="14" width="32" height="22" rx="6" fill="#f3ede2" />
+                <circle cx="25" cy="25" r="3.5" fill="#0f0e0c" />
+                <circle cx="39" cy="25" r="3.5" fill="#0f0e0c" />
+                <rect x="24" y="31" width="16" height="2.5" rx="1.25" fill="#0f0e0c" />
+                <rect x="12" y="38" width="40" height="28" rx="4" fill="#c9a25b" />
+                <circle cx="32" cy="50" r="6" fill="#0f0e0c" />
+                <circle cx="32" cy="50" r="3" fill="#e07a7a" />
+                <circle cx="17" cy="44" r="2.5" fill="#e07a7a" />
+                <rect x="18" y="60" width="6" height="4" fill="#0f0e0c" />
+                <rect x="40" y="60" width="6" height="4" fill="#0f0e0c" />
+                <rect x="2" y="42" width="8" height="6" rx="2" fill="#f3ede2" />
+                <rect x="54" y="42" width="8" height="6" rx="2" fill="#f3ede2" />
+                <rect x="18" y="66" width="10" height="12" rx="2" fill="#f3ede2" />
+                <rect x="36" y="66" width="10" height="12" rx="2" fill="#f3ede2" />
+                <rect x="15" y="76" width="16" height="4" rx="2" fill="#c9a25b" />
+                <rect x="33" y="76" width="16" height="4" rx="2" fill="#c9a25b" />
+              </svg>
+            </div>
+          </div>
+        </div>
+        <p class="loading-caption">Analyzing your website&hellip;</p>
+      </div>
+
+      <script>
+        (function () {
+          var form = document.getElementById("ai-magic-form");
+          var loading = document.getElementById("ai-magic-loading");
+          if (!form || !loading) return;
+          form.addEventListener("submit", function () {
+            form.hidden = true;
+            loading.hidden = false;
+          });
+        })();
+      </script>
       {% elif tab == "manual-enrol" %}
       <h2 class="tab-title">Enrol Brand Manually</h2>
       <p>Please enter information about your brand.</p>
