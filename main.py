@@ -50,9 +50,6 @@ app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
 
 NAV_LINKS = [
-    ("/manifesto", "The Manifesto"),
-    ("/signals", "Signals"),
-    ("/advisory", "Advisory"),
     ("/login", "Login"),
     ("/signup", "Signup"),
 ]
@@ -74,21 +71,6 @@ def favicon():
 @app.get("/")
 def home(request: Request):
     return render(request, "index.html", active="/")
-
-
-@app.get("/manifesto")
-def manifesto(request: Request):
-    return render(request, "manifesto.html", active="/manifesto")
-
-
-@app.get("/signals")
-def signals(request: Request):
-    return render(request, "signals.html", active="/signals")
-
-
-@app.get("/advisory")
-def advisory(request: Request):
-    return render(request, "advisory.html", active="/advisory")
 
 
 @app.get("/about")
