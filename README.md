@@ -109,10 +109,19 @@ undecryptable, since they were encrypted with the old key.
 ## AI brand analysis (Vercel AI Gateway)
 
 "Enrol Brand" (`/dashboard?tab=ai-magic`) fetches the submitted website, strips it down to plain text,
-and asks an LLM — via [LangChain](https://python.langchain.com/) (`langchain-openai`'s `ChatOpenAI`)
-pointed at the [Vercel AI Gateway](https://vercel.com/docs/ai-gateway)'s OpenAI-compatible endpoint
-(`ai_analysis.py`) — to infer answers to the same fields as the manual enrolment form. The whole thing
-then auto-saves and lands on the finished profile screen with no extra clicks.
+and runs two separate LLM calls — via [LangChain](https://python.langchain.com/) (`langchain-openai`'s
+`ChatOpenAI`) pointed at the [Vercel AI Gateway](https://vercel.com/docs/ai-gateway)'s OpenAI-compatible
+endpoint (`ai_analysis.py`):
+
+1. `analyze_brand_website` — the Website and Positioning fields.
+2. `analyze_tone_of_voice` — a secondary query classifying the brand along the eight Tone of Voice
+   spectrums (formal/informal, playful/serious, expressive/restrained, educational/conversational,
+   aspirational/accessible, direct/narrative, emotional/functional, community-led/authoritative), each
+   with a short justification.
+
+Both share the same underlying model call, JSON parsing, and fallback/logging logic, just with
+different prompts. Results from both are merged before the whole thing auto-saves and lands on the
+finished profile screen with no extra clicks.
 
 | Variable | Required | Description |
 | --- | --- | --- |

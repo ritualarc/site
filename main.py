@@ -19,7 +19,13 @@ from account_store import (
     save_account_type,
     save_brand_profile,
 )
-from ai_analysis import AI_ANALYSIS_CONFIGURED, AIAnalysisError, analyze_brand_website, fetch_website_text
+from ai_analysis import (
+    AI_ANALYSIS_CONFIGURED,
+    AIAnalysisError,
+    analyze_brand_website,
+    analyze_tone_of_voice,
+    fetch_website_text,
+)
 from auth import AUTH0_CLIENT_ID, AUTH0_CONFIGURED, AUTH0_DOMAIN, oauth
 
 logger = logging.getLogger(__name__)
@@ -198,10 +204,24 @@ BRAND_PROFILE_FIELDS = [
     ("differentiation", "Points of differentiation"),
 ]
 
-BRAND_PROFILE_FIELD_LABELS = dict(BRAND_PROFILE_FIELDS)
+TONE_OF_VOICE_FIELDS = [
+    ("formal_informal", "Formal / Informal"),
+    ("playful_serious", "Playful / Serious"),
+    ("expressive_restrained", "Expressive / Restrained"),
+    ("educational_conversational", "Educational / Conversational"),
+    ("aspirational_accessible", "Aspirational / Accessible"),
+    ("direct_narrative", "Direct / Narrative"),
+    ("emotional_functional", "Emotional / Functional"),
+    ("community_led_authoritative", "Community-led / Authoritative"),
+]
 
-# Groups fields for the read-only Brand Profile display. "Tone of Voice" has no
-# fields yet — it still renders as a heading with nothing under it.
+# All persisted/editable brand profile fields: positioning fields plus the tone-of-voice
+# spectrums. Used for the manual entry form, saving, and labels — the two lists stay
+# separate because AI enrolment queries them in two separate calls (see ai_analysis.py).
+ALL_PROFILE_FIELDS = BRAND_PROFILE_FIELDS + TONE_OF_VOICE_FIELDS
+ALL_PROFILE_FIELD_LABELS = dict(ALL_PROFILE_FIELDS)
+
+# Groups fields for the read-only Brand Profile display.
 BRAND_PROFILE_SECTIONS = [
     ("Website", ["website_url"]),
     (
@@ -216,7 +236,7 @@ BRAND_PROFILE_SECTIONS = [
             "differentiation",
         ],
     ),
-    ("Tone of Voice", []),
+    ("Tone of Voice", [key for key, _label in TONE_OF_VOICE_FIELDS]),
 ]
 
 
@@ -251,9 +271,9 @@ async def dashboard(request: Request, tab: str = "brand-profile", q: str = ""):
             "tab": tab,
             "query": q,
             "brand_profile": brand_profile,
-            "brand_profile_fields": BRAND_PROFILE_FIELDS,
+            "brand_profile_fields": ALL_PROFILE_FIELDS,
             "brand_profile_sections": BRAND_PROFILE_SECTIONS,
-            "brand_profile_field_labels": BRAND_PROFILE_FIELD_LABELS,
+            "brand_profile_field_labels": ALL_PROFILE_FIELD_LABELS,
             "root_domain": ROOT_DOMAIN_LINK,
         },
     )
@@ -267,7 +287,7 @@ async def save_brand_profile_form(request: Request):
 
     email = user.get("email")
     form = await request.form()
-    profile = {key: str(form.get(key, ""))[:300] for key, _label in BRAND_PROFILE_FIELDS}
+    profile = {key: str(form.get(key, ""))[:300] for key, _label in ALL_PROFILE_FIELDS}
 
     if email:
         try:
@@ -293,9 +313,9 @@ async def brand_profile_ai_analysis(request: Request):
         "account_type": account_type,
         "tab": "ai-magic",
         "query": "",
-        "brand_profile_fields": BRAND_PROFILE_FIELDS,
+        "brand_profile_fields": ALL_PROFILE_FIELDS,
         "brand_profile_sections": BRAND_PROFILE_SECTIONS,
-        "brand_profile_field_labels": BRAND_PROFILE_FIELD_LABELS,
+        "brand_profile_field_labels": ALL_PROFILE_FIELD_LABELS,
         "ai_magic_url": url,
         "root_domain": ROOT_DOMAIN_LINK,
     }
@@ -311,6 +331,8 @@ async def brand_profile_ai_analysis(request: Request):
     try:
         page_text = await fetch_website_text(url)
         profile = await analyze_brand_website(url, page_text, BRAND_PROFILE_FIELDS)
+        # Secondary AI query: classify tone of voice separately from the positioning fields.
+        profile.update(await analyze_tone_of_voice(url, page_text, TONE_OF_VOICE_FIELDS))
     except AIAnalysisError:
         logger.exception("AI brand analysis failed")
         context["ai_error"] = "Could not analyze that website. Please check the URL and try again."
@@ -320,7 +342,7 @@ async def brand_profile_ai_analysis(request: Request):
     # it (once any "Unsure" fields are retried) so the whole flow completes hands-free.
     context["tab"] = "manual-enrol"
     context["brand_profile"] = profile
-    context["unsure_fields"] = [key for key, _label in BRAND_PROFILE_FIELDS if _is_unsure(profile.get(key))]
+    context["unsure_fields"] = [key for key, _label in ALL_PROFILE_FIELDS if _is_unsure(profile.get(key))]
     context["auto_save"] = True
     return templates.TemplateResponse(request, "dashboard.html", context)
 
@@ -339,14 +361,19 @@ async def brand_profile_ai_analysis_retry(request: Request):
     form = await request.form()
     url = str(form.get("url", "")).strip()
     requested_keys = set(form.getlist("fields"))
-    fields_to_retry = [(key, label) for key, label in BRAND_PROFILE_FIELDS if key in requested_keys]
+    main_fields_to_retry = [(key, label) for key, label in BRAND_PROFILE_FIELDS if key in requested_keys]
+    tone_fields_to_retry = [(key, label) for key, label in TONE_OF_VOICE_FIELDS if key in requested_keys]
 
-    if not url or not fields_to_retry or not AI_ANALYSIS_CONFIGURED:
+    if not url or not (main_fields_to_retry or tone_fields_to_retry) or not AI_ANALYSIS_CONFIGURED:
         return JSONResponse({})
 
     try:
         page_text = await fetch_website_text(url)
-        result = await analyze_brand_website(url, page_text, fields_to_retry)
+        result = {}
+        if main_fields_to_retry:
+            result.update(await analyze_brand_website(url, page_text, main_fields_to_retry))
+        if tone_fields_to_retry:
+            result.update(await analyze_tone_of_voice(url, page_text, tone_fields_to_retry))
     except AIAnalysisError:
         logger.exception("AI brand analysis retry failed")
         return JSONResponse({})

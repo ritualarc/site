@@ -97,22 +97,22 @@ def _parse_json_object(text: str) -> dict:
         raise AIAnalysisError(f"AI analysis returned invalid JSON: {exc}") from exc
 
 
-async def analyze_brand_website(url: str, page_text: str, fields: list[tuple[str, str]]) -> dict:
-    """Ask the configured AI Gateway model to infer brand profile answers from page text.
+async def _run_field_query(
+    url: str,
+    page_text: str,
+    fields: list[tuple[str, str]],
+    instructions: str,
+    system_prompt: str,
+    log_label: str,
+) -> dict:
+    """Shared LLM call: ask about `fields`, parse the JSON reply, log which model answered.
 
     Parsing is deliberately lenient (missing keys default to "") since fields may be
     added later and not every model will honor the requested shape exactly.
     """
-    if not AI_ANALYSIS_CONFIGURED:
-        raise AIAnalysisError("AI_GATEWAY_API_KEY and AI_MODEL must be set to run AI analysis.")
-
-    # website_url is supplied by the caller, not inferred — the model isn't asked for it.
-    fields_to_infer = [(key, label) for key, label in fields if key != "website_url"]
-
-    field_list = "\n".join(f'- "{key}": {label}' for key, label in fields_to_infer)
+    field_list = "\n".join(f'- "{key}": {label}' for key, label in fields)
     prompt = (
-        "You are a brand analyst. Based only on the webpage content below, infer concise "
-        "answers (each under 300 characters) for these brand profile fields:\n"
+        f"{instructions}\n"
         f"{field_list}\n\n"
         "If the content doesn't give enough information for a field, put the word Unsure in the field "
         "rather than guessing wildly.\n\n"
@@ -124,9 +124,7 @@ async def analyze_brand_website(url: str, page_text: str, fields: list[tuple[str
     try:
         response = await _chat_model.ainvoke(
             [
-                SystemMessage(
-                    content="You are a precise brand analyst. Respond with ONLY a single valid JSON object — no markdown, no commentary."
-                ),
+                SystemMessage(content=system_prompt),
                 HumanMessage(content=prompt),
             ]
         )
@@ -136,11 +134,61 @@ async def analyze_brand_website(url: str, page_text: str, fields: list[tuple[str
     model_used = (response.response_metadata or {}).get("model_name") or (response.response_metadata or {}).get(
         "model"
     )
-    logger.info("AI brand analysis served by model: %s", model_used or "unknown")
+    logger.info("%s served by model: %s", log_label, model_used or "unknown")
 
     raw = response.content or ""
     data = _parse_json_object(raw)
+    return {key: str(data.get(key) or "")[:300] for key, _label in fields}
 
-    profile = {key: str(data.get(key) or "")[:300] for key, _label in fields_to_infer}
+
+async def analyze_brand_website(url: str, page_text: str, fields: list[tuple[str, str]]) -> dict:
+    """Infer brand profile answers (positioning, proposition, etc.) from page text."""
+    if not AI_ANALYSIS_CONFIGURED:
+        raise AIAnalysisError("AI_GATEWAY_API_KEY and AI_MODEL must be set to run AI analysis.")
+
+    # website_url is supplied by the caller, not inferred — the model isn't asked for it.
+    fields_to_infer = [(key, label) for key, label in fields if key != "website_url"]
+
+    profile = await _run_field_query(
+        url,
+        page_text,
+        fields_to_infer,
+        instructions=(
+            "You are a brand analyst. Based only on the webpage content below, infer concise "
+            "answers (each under 300 characters) for these brand profile fields:"
+        ),
+        system_prompt=(
+            "You are a precise brand analyst. Respond with ONLY a single valid JSON object — "
+            "no markdown, no commentary."
+        ),
+        log_label="AI brand analysis",
+    )
     profile["website_url"] = url[:300]
     return profile
+
+
+async def analyze_tone_of_voice(url: str, page_text: str, dimensions: list[tuple[str, str]]) -> dict:
+    """Secondary AI query: classify the brand's tone of voice along each spectrum in `dimensions`.
+
+    Each dimension key maps to a "word / word" label (e.g. "Playful / Serious"); the model
+    is asked to name whichever word fits best plus a short justification.
+    """
+    if not AI_ANALYSIS_CONFIGURED:
+        raise AIAnalysisError("AI_GATEWAY_API_KEY and AI_MODEL must be set to run AI analysis.")
+
+    return await _run_field_query(
+        url,
+        page_text,
+        dimensions,
+        instructions=(
+            "You are a brand voice analyst. Based only on the webpage content below, classify this "
+            "brand's tone of voice along each of the following spectrums. For each one, name whichever "
+            "word from the pair fits best and give a short justification (each answer under 300 "
+            "characters):"
+        ),
+        system_prompt=(
+            "You are a precise brand voice analyst. Respond with ONLY a single valid JSON object — "
+            "no markdown, no commentary."
+        ),
+        log_label="AI tone-of-voice analysis",
+    )
