@@ -596,13 +596,14 @@
               return {};
             })
             .then(function (data) {
+              // Only one retry is attempted. Whatever comes back now is final:
+              // a real answer if the model resolved it, otherwise "Unsure" for good.
               pendingFields.forEach(function (el) {
-                var value = (data && data[el.name]) || "";
-                if (value.trim() && value.trim().toLowerCase() !== "unsure") {
-                  el.value = value;
-                  el.placeholder = "";
-                  el.removeAttribute("data-pending");
-                }
+                var value = ((data && data[el.name]) || "").trim();
+                var resolved = value && value.toLowerCase() !== "unsure" ? value : "Unsure";
+                el.value = resolved;
+                el.placeholder = "";
+                el.removeAttribute("data-pending");
               });
               if (banner) banner.hidden = true;
               if (saveBtn) saveBtn.disabled = false;
