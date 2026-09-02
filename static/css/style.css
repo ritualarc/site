@@ -64,10 +64,21 @@ a:hover {
 }
 
 .wordmark {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: var(--ink);
+}
+
+.wordmark img {
+  width: 32px;
+  height: 32px;
+}
+
+.wordmark span {
   font-family: Verdana, Geneva, "Segoe UI", Arial, sans-serif;
   font-size: 1.25rem;
   letter-spacing: 0.02em;
-  color: var(--ink);
 }
 
 .wordmark:hover {

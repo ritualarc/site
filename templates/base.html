@@ -11,7 +11,10 @@
 <body>
   <header class="site-header">
     <div class="header-inner">
-      <a class="wordmark" href="/">Ritual Arc</a>
+      <a class="wordmark" href="{{ root_domain }}">
+        <img src="/static/favicon.png" alt="" />
+        <span>Ritual Arc</span>
+      </a>
       <nav class="primary-nav">
         {% for href, label in nav_links %}
         <a href="{{ href }}"{% if active == href %} class="active"{% endif %}>{{ label }}</a>
@@ -26,13 +29,14 @@
 
   <footer class="site-footer">
     <div class="footer-links">
-      <a href="/about">About</a>
-      <a href="/contact">Contact</a>
+      {% for href, label in footer_links %}
+      <a href="{{ href }}">{{ label }}</a>
+      {% endfor %}
     </div>
     <div class="footer-links">
-      <a href="/privacy-policy">Privacy Policy</a>
-      <a href="/accessibility-statement">Accessibility Statement</a>
-      <a href="/terms-and-conditions">Terms &amp; Conditions</a>
+      {% for href, label in legal_links %}
+      <a href="{{ href }}">{{ label }}</a>
+      {% endfor %}
     </div>
     <div style="margin-top: 0.75rem;">&copy; 2026 by Ritual Arc</div>
   </footer>

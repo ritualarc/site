@@ -14,22 +14,19 @@ uvicorn main:app --reload
 
 Visit http://127.0.0.1:8000
 
-## Contact form email
+## Footer links (About, Contact, legal pages)
 
-The `/contact` form sends an email via SMTP (`mailer.py`) rather than storing submissions. It needs
-these environment variables set (locally via `export`, or in the Vercel project's Environment
-Variables settings):
+About, Contact, Privacy Policy, Accessibility Statement, and Terms & Conditions are no longer pages in
+this app — they live on the main marketing site instead. The footer (`base.html`, built from
+`FOOTER_LINKS`/`LEGAL_LINKS` in `main.py`) links out to that site's own pages at those same clean paths
+(`/about`, `/contact`, `/privacy-policy`, `/accessibility-statement`, `/terms-and-conditions`).
 
 | Variable | Required | Description |
 | --- | --- | --- |
-| `SMTP_USERNAME` | yes | The sending account's address, e.g. `theritualarc@gmail.com` |
-| `SMTP_PASSWORD` | yes | An app password for that account (for Gmail: enable 2-Step Verification, then create one at myaccount.google.com/apppasswords) |
-| `SMTP_HOST` | no | Defaults to `smtp.gmail.com` |
-| `SMTP_PORT` | no | Defaults to `465` |
-| `CONTACT_RECIPIENT` | no | Defaults to `theritualarc@gmail.com` |
+| `RITURAL_ARC_ROOT_DOMAIN` | yes | Base URL of the marketing site, e.g. `https://theritualarc.wixsite.com/theritualarc/` (trailing slash optional — it's stripped before appending a path) |
 
-Without `SMTP_USERNAME`/`SMTP_PASSWORD` set, submissions fail gracefully with an on-page error message
-instead of pretending to succeed.
+Without it set, footer links fall back to bare relative paths (e.g. `/about`), which won't resolve to
+anything in this app since those routes were removed.
 
 ## Signup / Login / Auth0
 

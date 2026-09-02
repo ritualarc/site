@@ -1,11 +1,10 @@
 import logging
 import os
-import smtplib
 from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.parse import urlencode
 
-from fastapi import FastAPI, Form, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -22,7 +21,6 @@ from account_store import (
 )
 from ai_analysis import AI_ANALYSIS_CONFIGURED, AIAnalysisError, analyze_brand_website, fetch_website_text
 from auth import AUTH0_CLIENT_ID, AUTH0_CONFIGURED, AUTH0_DOMAIN, oauth
-from mailer import EmailNotConfiguredError, send_contact_email
 
 logger = logging.getLogger(__name__)
 
@@ -54,12 +52,37 @@ NAV_LINKS = [
     ("/signup", "Signup"),
 ]
 
+# About, Contact, and the legal pages now live on the main marketing site rather
+# than this app; RITURAL_ARC_ROOT_DOMAIN points there (e.g. "https://theritualarc.wixsite.com/theritualarc/").
+RITURAL_ARC_ROOT_DOMAIN = os.environ.get("RITURAL_ARC_ROOT_DOMAIN", "").rstrip("/")
+
+FOOTER_LINKS = [
+    (f"{RITURAL_ARC_ROOT_DOMAIN}/about", "About"),
+    (f"{RITURAL_ARC_ROOT_DOMAIN}/contact", "Contact"),
+]
+
+LEGAL_LINKS = [
+    (f"{RITURAL_ARC_ROOT_DOMAIN}/privacy-policy", "Privacy Policy"),
+    (f"{RITURAL_ARC_ROOT_DOMAIN}/accessibility-statement", "Accessibility Statement"),
+    (f"{RITURAL_ARC_ROOT_DOMAIN}/terms-and-conditions", "Terms & Conditions"),
+]
+
+# Where the "Ritual Arc" logo/wordmark links to. Falls back to this app's own
+# home page if the root domain isn't configured, rather than a dead link.
+ROOT_DOMAIN_LINK = RITURAL_ARC_ROOT_DOMAIN or "/"
+
 
 def render(request: Request, template_name: str, **context):
     return templates.TemplateResponse(
         request,
         template_name,
-        {"nav_links": NAV_LINKS, **context},
+        {
+            "nav_links": NAV_LINKS,
+            "footer_links": FOOTER_LINKS,
+            "legal_links": LEGAL_LINKS,
+            "root_domain": ROOT_DOMAIN_LINK,
+            **context,
+        },
     )
 
 
@@ -71,33 +94,6 @@ def favicon():
 @app.get("/")
 def home(request: Request):
     return render(request, "index.html", active="/")
-
-
-@app.get("/about")
-def about(request: Request):
-    return render(request, "about.html", active="/about")
-
-
-@app.get("/contact")
-def contact(request: Request):
-    return render(request, "contact.html", active="/contact", submitted=False)
-
-
-@app.post("/contact")
-def contact_submit(
-    request: Request,
-    first_name: str = Form(...),
-    last_name: str = Form(...),
-    email: str = Form(...),
-    message: str = Form(...),
-):
-    try:
-        send_contact_email(first_name, last_name, email, message)
-    except (EmailNotConfiguredError, smtplib.SMTPException, OSError):
-        logger.exception("Failed to send contact form email")
-        return render(request, "contact.html", active="/contact", submitted=False, send_failed=True)
-
-    return render(request, "contact.html", active="/contact", submitted=True, first_name=first_name)
 
 
 @app.get("/login")
@@ -228,6 +224,7 @@ async def dashboard(request: Request, tab: str = "brand-profile", q: str = ""):
             "query": q,
             "brand_profile": brand_profile,
             "brand_profile_fields": BRAND_PROFILE_FIELDS,
+            "root_domain": ROOT_DOMAIN_LINK,
         },
     )
 
@@ -268,6 +265,7 @@ async def brand_profile_ai_analysis(request: Request):
         "query": "",
         "brand_profile_fields": BRAND_PROFILE_FIELDS,
         "ai_magic_url": url,
+        "root_domain": ROOT_DOMAIN_LINK,
     }
 
     if not url:
@@ -315,18 +313,3 @@ def logout(request: Request):
         return RedirectResponse(url="/")
     params = urlencode({"client_id": AUTH0_CLIENT_ID, "returnTo": str(request.base_url)})
     return RedirectResponse(url=f"https://{AUTH0_DOMAIN}/v2/logout?{params}")
-
-
-@app.get("/privacy-policy")
-def privacy_policy(request: Request):
-    return render(request, "legal.html", active="", page_title="Privacy Policy")
-
-
-@app.get("/accessibility-statement")
-def accessibility_statement(request: Request):
-    return render(request, "legal.html", active="", page_title="Accessibility Statement")
-
-
-@app.get("/terms-and-conditions")
-def terms_and_conditions(request: Request):
-    return render(request, "legal.html", active="", page_title="Terms & Conditions")
