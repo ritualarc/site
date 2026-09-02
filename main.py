@@ -196,7 +196,27 @@ BRAND_PROFILE_FIELDS = [
     ("fashion_trend_longevity", "Relationship to fashion, trend and/or longevity"),
     ("accessibility_exclusivity", "Accessibility or exclusivity"),
     ("differentiation", "Points of differentiation"),
-    ("competitive_landscape", "Perceived competitive landscape"),
+]
+
+BRAND_PROFILE_FIELD_LABELS = dict(BRAND_PROFILE_FIELDS)
+
+# Groups fields for the read-only Brand Profile display. "Tone of Voice" has no
+# fields yet — it still renders as a heading with nothing under it.
+BRAND_PROFILE_SECTIONS = [
+    ("Website", ["website_url"]),
+    (
+        "Positioning",
+        [
+            "market_positioning",
+            "brand_proposition",
+            "aesthetic_positioning",
+            "cultural_lifestyle_positioning",
+            "fashion_trend_longevity",
+            "accessibility_exclusivity",
+            "differentiation",
+        ],
+    ),
+    ("Tone of Voice", []),
 ]
 
 
@@ -232,6 +252,8 @@ async def dashboard(request: Request, tab: str = "brand-profile", q: str = ""):
             "query": q,
             "brand_profile": brand_profile,
             "brand_profile_fields": BRAND_PROFILE_FIELDS,
+            "brand_profile_sections": BRAND_PROFILE_SECTIONS,
+            "brand_profile_field_labels": BRAND_PROFILE_FIELD_LABELS,
             "root_domain": ROOT_DOMAIN_LINK,
         },
     )
@@ -272,6 +294,8 @@ async def brand_profile_ai_analysis(request: Request):
         "tab": "ai-magic",
         "query": "",
         "brand_profile_fields": BRAND_PROFILE_FIELDS,
+        "brand_profile_sections": BRAND_PROFILE_SECTIONS,
+        "brand_profile_field_labels": BRAND_PROFILE_FIELD_LABELS,
         "ai_magic_url": url,
         "root_domain": ROOT_DOMAIN_LINK,
     }

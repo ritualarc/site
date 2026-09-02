@@ -281,6 +281,20 @@
       overflow-wrap: break-word;
     }
 
+    .app-content .profile-section-title {
+      font-family: "Playfair Display", serif;
+      color: var(--ink);
+      font-size: 1.1rem;
+      margin: 1.75rem 0 1rem;
+      padding-bottom: 0.4rem;
+      border-bottom: 1px solid var(--line, #2c2820);
+      max-width: 520px;
+    }
+
+    .app-content .profile-section-title:first-of-type {
+      margin-top: 1rem;
+    }
+
     .app-content .profile-field {
       margin-bottom: 1.25rem;
       max-width: 520px;
@@ -443,11 +457,14 @@
       {% if tab == "brand-profile" %}
         {% if brand_profile %}
         <h2 class="tab-title">Brand Profile</h2>
-        {% for key, label in brand_profile_fields %}
+        {% for section_title, field_keys in brand_profile_sections %}
+        <h3 class="profile-section-title">{{ section_title }}</h3>
+        {% for key in field_keys %}
         <div class="profile-field">
-          <div class="profile-field-label">{{ label }}</div>
+          <div class="profile-field-label">{{ brand_profile_field_labels.get(key, key) }}</div>
           <div class="profile-field-value">{{ brand_profile.get(key) or "—" }}</div>
         </div>
+        {% endfor %}
         {% endfor %}
         <div class="enrol-buttons" style="margin-top: 1.5rem;">
           <a class="button" href="/dashboard?tab=manual-enrol">Edit</a>
