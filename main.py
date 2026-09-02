@@ -5,7 +5,7 @@ from pathlib import Path
 from urllib.parse import urlencode
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
@@ -183,6 +183,10 @@ DASHBOARD_TABS = {
     "inbox",
 }
 
+def _is_unsure(value: str) -> bool:
+    return (value or "").strip().lower() == "unsure"
+
+
 BRAND_PROFILE_FIELDS = [
     ("website_url", "URL of website"),
     ("market_positioning", "Overall market positioning"),
@@ -287,7 +291,37 @@ async def brand_profile_ai_analysis(request: Request):
     # Show the AI's answers in the editable manual-entry form for review before saving.
     context["tab"] = "manual-enrol"
     context["brand_profile"] = profile
+    context["unsure_fields"] = [key for key, _label in BRAND_PROFILE_FIELDS if _is_unsure(profile.get(key))]
     return templates.TemplateResponse(request, "dashboard.html", context)
+
+
+@app.post("/dashboard/brand-profile/ai-analysis/retry")
+async def brand_profile_ai_analysis_retry(request: Request):
+    """Re-run AI analysis for just the fields the model was previously unsure about.
+
+    Called via fetch() from the manual-enrol page's own script, not a full page
+    navigation, so it returns JSON rather than rendering a template.
+    """
+    user = request.session.get("user")
+    if not user:
+        raise HTTPException(status_code=401)
+
+    form = await request.form()
+    url = str(form.get("url", "")).strip()
+    requested_keys = set(form.getlist("fields"))
+    fields_to_retry = [(key, label) for key, label in BRAND_PROFILE_FIELDS if key in requested_keys]
+
+    if not url or not fields_to_retry or not AI_ANALYSIS_CONFIGURED:
+        return JSONResponse({})
+
+    try:
+        page_text = await fetch_website_text(url)
+        result = await analyze_brand_website(url, page_text, fields_to_retry)
+    except AIAnalysisError:
+        logger.exception("AI brand analysis retry failed")
+        return JSONResponse({})
+
+    return JSONResponse(result)
 
 
 @app.post("/dashboard/brand-profile/delete")

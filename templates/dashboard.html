@@ -330,6 +330,27 @@
       font-style: italic;
     }
 
+    .retry-banner {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      max-width: 520px;
+      margin-bottom: 1rem;
+      padding: 0.5rem 0.75rem;
+      border: 1px solid var(--line, #2c2820);
+      border-radius: 6px;
+    }
+
+    .retry-banner .robot-lane {
+      width: 140px;
+      margin: 0;
+      flex-shrink: 0;
+    }
+
+    .retry-banner .loading-caption {
+      margin: 0;
+    }
+
     @keyframes robot-walk {
       0% {
         left: 0%;
@@ -491,18 +512,104 @@
         })();
       </script>
       {% elif tab == "manual-enrol" %}
+      {% set unsure = unsure_fields or [] %}
       <h2 class="tab-title">Enrol Brand Manually</h2>
       <p>Please enter information about your brand.</p>
-      <form method="post" action="/dashboard/brand-profile">
+
+      {% if unsure %}
+      <div id="retry-banner" class="retry-banner">
+        <div class="robot-lane">
+          <div class="robot-walker">
+            <div class="robot-bob">
+              <svg viewBox="0 0 64 80" xmlns="http://www.w3.org/2000/svg" width="64" height="80">
+                <line x1="32" y1="4" x2="32" y2="14" stroke="#c9a25b" stroke-width="2" />
+                <circle cx="32" cy="4" r="3" fill="#c9a25b" />
+                <rect x="16" y="14" width="32" height="22" rx="6" fill="#f3ede2" />
+                <circle cx="25" cy="25" r="3.5" fill="#0f0e0c" />
+                <circle cx="39" cy="25" r="3.5" fill="#0f0e0c" />
+                <rect x="24" y="31" width="16" height="2.5" rx="1.25" fill="#0f0e0c" />
+                <rect x="12" y="38" width="40" height="28" rx="4" fill="#c9a25b" />
+                <circle cx="32" cy="50" r="6" fill="#0f0e0c" />
+                <circle cx="32" cy="50" r="3" fill="#e07a7a" />
+                <circle cx="17" cy="44" r="2.5" fill="#e07a7a" />
+                <rect x="18" y="60" width="6" height="4" fill="#0f0e0c" />
+                <rect x="40" y="60" width="6" height="4" fill="#0f0e0c" />
+                <rect x="2" y="42" width="8" height="6" rx="2" fill="#f3ede2" />
+                <rect x="54" y="42" width="8" height="6" rx="2" fill="#f3ede2" />
+                <rect x="18" y="66" width="10" height="12" rx="2" fill="#f3ede2" />
+                <rect x="36" y="66" width="10" height="12" rx="2" fill="#f3ede2" />
+                <rect x="15" y="76" width="16" height="4" rx="2" fill="#c9a25b" />
+                <rect x="33" y="76" width="16" height="4" rx="2" fill="#c9a25b" />
+              </svg>
+            </div>
+          </div>
+        </div>
+        <span class="loading-caption">Still working on a few details&hellip;</span>
+      </div>
+      {% endif %}
+
+      <form method="post" action="/dashboard/brand-profile" id="manual-enrol-form">
         {% for key, label in brand_profile_fields %}
         <label class="field-label" for="{{ key }}">{{ label }}</label>
-        <textarea class="text-area" id="{{ key }}" name="{{ key }}" maxlength="300" rows="2">{{ brand_profile.get(key) if brand_profile else "" }}</textarea>
+        <textarea
+          class="text-area"
+          id="{{ key }}"
+          name="{{ key }}"
+          maxlength="300"
+          rows="2"
+          {% if key in unsure %}placeholder="Still working on this" data-pending="true"{% endif %}
+        >{{ "" if key in unsure else (brand_profile.get(key) if brand_profile else "") }}</textarea>
         {% endfor %}
         <div class="enrol-buttons">
-          <button type="submit" class="enrol">Save</button>
+          <button type="submit" class="enrol" id="manual-enrol-save"{% if unsure %} disabled{% endif %}>Save</button>
           <a class="button" href="/dashboard?tab=brand-profile">Cancel</a>
         </div>
       </form>
+
+      {% if unsure %}
+      <script>
+        (function () {
+          var banner = document.getElementById("retry-banner");
+          var saveBtn = document.getElementById("manual-enrol-save");
+          var pendingFields = Array.prototype.slice.call(document.querySelectorAll('[data-pending="true"]'));
+          if (!pendingFields.length) {
+            if (banner) banner.hidden = true;
+            if (saveBtn) saveBtn.disabled = false;
+            return;
+          }
+
+          var body = new URLSearchParams();
+          body.set("url", {{ (ai_magic_url or "") | tojson }});
+          pendingFields.forEach(function (el) {
+            body.append("fields", el.name);
+          });
+
+          fetch("/dashboard/brand-profile/ai-analysis/retry", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: body.toString(),
+          })
+            .then(function (response) {
+              return response.ok ? response.json() : {};
+            })
+            .catch(function () {
+              return {};
+            })
+            .then(function (data) {
+              pendingFields.forEach(function (el) {
+                var value = (data && data[el.name]) || "";
+                if (value.trim() && value.trim().toLowerCase() !== "unsure") {
+                  el.value = value;
+                  el.placeholder = "";
+                  el.removeAttribute("data-pending");
+                }
+              });
+              if (banner) banner.hidden = true;
+              if (saveBtn) saveBtn.disabled = false;
+            });
+        })();
+      </script>
+      {% endif %}
       {% elif tab == "delete-profile-confirm" %}
       <h2 class="tab-title">Delete brand profile?</h2>
       <div class="enrol-buttons">
