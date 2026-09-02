@@ -461,8 +461,16 @@
         <h3 class="profile-section-title">{{ section_title }}</h3>
         {% for key in field_keys %}
         <div class="profile-field">
+          {% if tone_of_voice_keys and key in tone_of_voice_keys %}
+          {% set tone = format_tone_field(brand_profile.get(key), brand_profile_field_labels.get(key, key)) %}
+          <div class="profile-field-label">
+            {% for word, chosen in tone.words %}{% if chosen %}<strong>{{ word }}</strong>{% else %}{{ word }}{% endif %}{% if not loop.last %} / {% endif %}{% endfor %}
+          </div>
+          <div class="profile-field-value">{{ tone.value_text }}</div>
+          {% else %}
           <div class="profile-field-label">{{ brand_profile_field_labels.get(key, key) }}</div>
           <div class="profile-field-value">{{ brand_profile.get(key) or "—" }}</div>
+          {% endif %}
         </div>
         {% endfor %}
         {% endfor %}

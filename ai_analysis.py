@@ -97,25 +97,25 @@ def _parse_json_object(text: str) -> dict:
         raise AIAnalysisError(f"AI analysis returned invalid JSON: {exc}") from exc
 
 
-async def _run_field_query(
+async def _invoke_model(
     url: str,
     page_text: str,
     fields: list[tuple[str, str]],
     instructions: str,
+    format_instructions: str,
     system_prompt: str,
     log_label: str,
 ) -> dict:
-    """Shared LLM call: ask about `fields`, parse the JSON reply, log which model answered.
+    """Shared LLM call: ask about `fields`, parse and return the raw JSON reply.
 
-    Parsing is deliberately lenient (missing keys default to "") since fields may be
-    added later and not every model will honor the requested shape exactly.
+    Returns the parsed dict as-is (values may be plain strings or, for callers that ask
+    for it, nested objects) — callers are responsible for shaping their own field values.
     """
     field_list = "\n".join(f'- "{key}": {label}' for key, label in fields)
     prompt = (
         f"{instructions}\n"
         f"{field_list}\n\n"
-        "If the content doesn't give enough information for a field, put the word Unsure in the field "
-        "rather than guessing wildly.\n\n"
+        f"{format_instructions}\n\n"
         f"Website URL: {url}\n\n"
         f"Webpage content:\n{page_text}\n\n"
         "Respond with ONLY a single JSON object whose keys are exactly the field names above."
@@ -137,19 +137,22 @@ async def _run_field_query(
     logger.info("%s served by model: %s", log_label, model_used or "unknown")
 
     raw = response.content or ""
-    data = _parse_json_object(raw)
-    return {key: str(data.get(key) or "")[:300] for key, _label in fields}
+    return _parse_json_object(raw)
 
 
 async def analyze_brand_website(url: str, page_text: str, fields: list[tuple[str, str]]) -> dict:
-    """Infer brand profile answers (positioning, proposition, etc.) from page text."""
+    """Infer brand profile answers (positioning, proposition, etc.) from page text.
+
+    Parsing is deliberately lenient (missing keys default to "") since fields may be
+    added later and not every model will honor the requested shape exactly.
+    """
     if not AI_ANALYSIS_CONFIGURED:
         raise AIAnalysisError("AI_GATEWAY_API_KEY and AI_MODEL must be set to run AI analysis.")
 
     # website_url is supplied by the caller, not inferred — the model isn't asked for it.
     fields_to_infer = [(key, label) for key, label in fields if key != "website_url"]
 
-    profile = await _run_field_query(
+    data = await _invoke_model(
         url,
         page_text,
         fields_to_infer,
@@ -157,14 +160,40 @@ async def analyze_brand_website(url: str, page_text: str, fields: list[tuple[str
             "You are a brand analyst. Based only on the webpage content below, infer concise "
             "answers (each under 300 characters) for these brand profile fields:"
         ),
+        format_instructions=(
+            "For each field, respond with a plain string answer. If the content doesn't give enough "
+            "information for a field, put the word Unsure in the field rather than guessing wildly."
+        ),
         system_prompt=(
             "You are a precise brand analyst. Respond with ONLY a single valid JSON object — "
             "no markdown, no commentary."
         ),
         log_label="AI brand analysis",
     )
+    profile = {key: str(data.get(key) or "")[:300] for key, _label in fields_to_infer}
     profile["website_url"] = url[:300]
     return profile
+
+
+def _format_tone_value(raw_value) -> str:
+    """Encode a tone-of-voice answer as "Choice — Justification" plain text.
+
+    This keeps every field a flat string end to end (manual entry form, save, DB), so
+    nothing else in the app needs to know tone fields are structured; only the
+    read-only display parses this format back apart (see main.py's _format_tone_field).
+    """
+    if isinstance(raw_value, dict):
+        choice = str(raw_value.get("choice") or "").strip()
+        justification = str(raw_value.get("justification") or "").strip()
+    else:
+        choice = str(raw_value or "").strip()
+        justification = ""
+
+    if not choice or choice.lower() == "unsure":
+        return "Unsure"
+
+    value = f"{choice} — {justification}" if justification else choice
+    return value[:300]
 
 
 async def analyze_tone_of_voice(url: str, page_text: str, dimensions: list[tuple[str, str]]) -> dict:
@@ -176,15 +205,19 @@ async def analyze_tone_of_voice(url: str, page_text: str, dimensions: list[tuple
     if not AI_ANALYSIS_CONFIGURED:
         raise AIAnalysisError("AI_GATEWAY_API_KEY and AI_MODEL must be set to run AI analysis.")
 
-    return await _run_field_query(
+    data = await _invoke_model(
         url,
         page_text,
         dimensions,
         instructions=(
             "You are a brand voice analyst. Based only on the webpage content below, classify this "
-            "brand's tone of voice along each of the following spectrums. For each one, name whichever "
-            "word from the pair fits best and give a short justification (each answer under 300 "
-            "characters):"
+            "brand's tone of voice along each of the following spectrums:"
+        ),
+        format_instructions=(
+            'For each spectrum, respond with an object of the form {"choice": "<the single word from '
+            'the pair that fits best, exactly as written>", "justification": "<a short one-sentence '
+            'justification, under 300 characters>"}. If the content doesn\'t give enough information to '
+            'classify a spectrum, set "choice" to "Unsure" and "justification" to an empty string.'
         ),
         system_prompt=(
             "You are a precise brand voice analyst. Respond with ONLY a single valid JSON object — "
@@ -192,3 +225,4 @@ async def analyze_tone_of_voice(url: str, page_text: str, dimensions: list[tuple
         ),
         log_label="AI tone-of-voice analysis",
     )
+    return {key: _format_tone_value(data.get(key)) for key, _label in dimensions}

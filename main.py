@@ -215,6 +215,31 @@ TONE_OF_VOICE_FIELDS = [
     ("community_led_authoritative", "Community-led / Authoritative"),
 ]
 
+def _format_tone_field(value: str, label: str) -> dict:
+    """Split a stored "Choice — Justification" tone-of-voice value for display.
+
+    Pairs each word of the "Word / Word" label with whether it was the chosen one (so
+    the template can bold it), plus the text to show underneath.
+    """
+    words = [word.strip() for word in label.split("/")]
+    value = (value or "").strip()
+
+    choice, justification = "", ""
+    if value:
+        if " — " in value:
+            choice, justification = value.split(" — ", 1)
+        else:
+            choice = value
+        choice = choice.strip()
+        justification = justification.strip()
+
+    resolved = bool(choice) and choice.lower() != "unsure"
+    return {
+        "words": [(word, resolved and word.lower() == choice.lower()) for word in words],
+        "value_text": f"Justification: {justification}" if resolved else "—",
+    }
+
+
 # All persisted/editable brand profile fields: positioning fields plus the tone-of-voice
 # spectrums. Used for the manual entry form, saving, and labels — the two lists stay
 # separate because AI enrolment queries them in two separate calls (see ai_analysis.py).
@@ -274,6 +299,8 @@ async def dashboard(request: Request, tab: str = "brand-profile", q: str = ""):
             "brand_profile_fields": ALL_PROFILE_FIELDS,
             "brand_profile_sections": BRAND_PROFILE_SECTIONS,
             "brand_profile_field_labels": ALL_PROFILE_FIELD_LABELS,
+            "tone_of_voice_keys": {key for key, _label in TONE_OF_VOICE_FIELDS},
+            "format_tone_field": _format_tone_field,
             "root_domain": ROOT_DOMAIN_LINK,
         },
     )
