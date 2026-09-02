@@ -218,6 +218,10 @@ async def dashboard(request: Request, tab: str = "brand-profile", q: str = ""):
             except AccountStoreError:
                 logger.exception("Failed to load brand profile")
 
+    if tab == "brand-profile" and brand_profile is None:
+        # Nothing enrolled yet: skip the two-button chooser and go straight to AI Magic.
+        tab = "ai-magic"
+
     return templates.TemplateResponse(
         request,
         "dashboard.html",
@@ -288,10 +292,12 @@ async def brand_profile_ai_analysis(request: Request):
         context["ai_error"] = "Could not analyze that website. Please check the URL and try again."
         return templates.TemplateResponse(request, "dashboard.html", context)
 
-    # Show the AI's answers in the editable manual-entry form for review before saving.
+    # Land on the manual-entry form with the AI's answers filled in, then auto-submit
+    # it (once any "Unsure" fields are retried) so the whole flow completes hands-free.
     context["tab"] = "manual-enrol"
     context["brand_profile"] = profile
     context["unsure_fields"] = [key for key, _label in BRAND_PROFILE_FIELDS if _is_unsure(profile.get(key))]
+    context["auto_save"] = True
     return templates.TemplateResponse(request, "dashboard.html", context)
 
 

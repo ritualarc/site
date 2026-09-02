@@ -461,7 +461,7 @@
         </div>
         {% endif %}
       {% elif tab == "ai-magic" %}
-      <h2 class="tab-title">Enrol Brand using AI Magic</h2>
+      <h2 class="tab-title">Enrol Brand</h2>
       <p>Let me infer your brand profile from your brand's website. Please enter the URL of your website:</p>
       {% if ai_error %}
       <p style="color: #e07a7a;">{{ ai_error }}</p>
@@ -470,7 +470,7 @@
         <input type="text" class="text-input" name="url" placeholder="brand.com" value="{{ ai_magic_url or '' }}" />
         <div class="enrol-buttons">
           <button type="submit" class="enrol">Begin Analysis</button>
-          <a class="button" href="/dashboard?tab=brand-profile">Cancel</a>
+          <a class="button" href="/dashboard?tab=manual-enrol">Skip Analysis</a>
         </div>
       </form>
 
@@ -577,8 +577,12 @@
           var saveBtn = document.getElementById("manual-enrol-save");
           var pendingFields = Array.prototype.slice.call(document.querySelectorAll('[data-pending="true"]'));
           if (!pendingFields.length) {
+            {% if auto_save %}
+            document.getElementById("manual-enrol-form").submit();
+            {% else %}
             if (banner) banner.hidden = true;
             if (saveBtn) saveBtn.disabled = false;
+            {% endif %}
             return;
           }
 
@@ -609,10 +613,18 @@
                 el.placeholder = "";
                 el.removeAttribute("data-pending");
               });
+              {% if auto_save %}
+              document.getElementById("manual-enrol-form").submit();
+              {% else %}
               if (banner) banner.hidden = true;
               if (saveBtn) saveBtn.disabled = false;
+              {% endif %}
             });
         })();
+      </script>
+      {% elif auto_save %}
+      <script>
+        document.getElementById("manual-enrol-form").submit();
       </script>
       {% endif %}
       {% elif tab == "delete-profile-confirm" %}
