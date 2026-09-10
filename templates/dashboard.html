@@ -257,6 +257,40 @@
       color: #8a8378;
     }
 
+    .chat-window {
+      max-width: 520px;
+      border: 1px solid var(--line, #2c2820);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    .chat-messages {
+      min-height: 220px;
+      max-height: 320px;
+      overflow-y: auto;
+      padding: 1rem;
+    }
+
+    .chat-placeholder {
+      color: var(--ink-dim);
+      font-style: italic;
+      margin: 0;
+    }
+
+    .chat-input-row {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.75rem;
+      border-top: 1px solid var(--line, #2c2820);
+    }
+
+    .chat-input-row .text-input {
+      flex: 1;
+      max-width: none;
+      margin: 0;
+    }
+
     .app-content .field-label {
       display: block;
       color: var(--ink);
@@ -446,9 +480,15 @@
       <div class="email">{{ user.get("email") }}</div>
     </div>
     <div class="tab-group">
+      {% if account_type == "Member" %}
+      <a class="tab-button{% if tab == 'my-stuff' %} active{% endif %}" href="/dashboard?tab=my-stuff">My Stuff</a>
+      <a class="tab-button{% if tab == 'speak-to-me' %} active{% endif %}" href="/dashboard?tab=speak-to-me">Speak to Me</a>
+      <a class="tab-button{% if tab == 'care' %} active{% endif %}" href="/dashboard?tab=care">Care</a>
+      {% else %}
       <a class="tab-button{% if tab in ('brand-profile', 'ai-magic', 'manual-enrol', 'delete-profile-confirm') %} active{% endif %}" href="/dashboard?tab=brand-profile">Brand Profile</a>
       <a class="tab-button{% if tab == 'product-profiles' %} active{% endif %}" href="/dashboard?tab=product-profiles">Product Profiles</a>
       <a class="tab-button{% if tab == 'intelligence' %} active{% endif %}" href="/dashboard?tab=intelligence">Intelligence</a>
+      {% endif %}
     </div>
     <a class="inbox-link" href="/dashboard?tab=inbox">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="M2 6l10 7 10-7"></path></svg>
@@ -668,6 +708,21 @@
       <p>Please enrol the brand before products.</p>
       {% elif tab == "intelligence" %}
       <p>What should go here???</p>
+      {% elif tab == "my-stuff" %}
+      <p>Coming Soon</p>
+      {% elif tab == "speak-to-me" %}
+      <h2 class="tab-title">Speak to Me</h2>
+      <div class="chat-window">
+        <div class="chat-messages">
+          <p class="chat-placeholder">Say hello — I'm listening.</p>
+        </div>
+        <div class="chat-input-row">
+          <input type="text" class="text-input" placeholder="Type a message&hellip;" autocomplete="off" />
+          <button type="button" class="enrol">Send</button>
+        </div>
+      </div>
+      {% elif tab == "care" %}
+      <p>Coming Soon</p>
       {% elif tab == "search" %}
       <p>Search not implemented yet</p>
       {% elif tab == "help" %}

@@ -177,17 +177,22 @@ def no_account(request: Request):
     return render(request, "no_account.html", active="", user=pending_user)
 
 
-DASHBOARD_TABS = {
+BRAND_DASHBOARD_TABS = {
     "brand-profile",
     "ai-magic",
     "manual-enrol",
     "delete-profile-confirm",
     "product-profiles",
     "intelligence",
-    "search",
-    "help",
-    "inbox",
 }
+
+MEMBER_DASHBOARD_TABS = {
+    "my-stuff",
+    "speak-to-me",
+    "care",
+}
+
+SHARED_DASHBOARD_TABS = {"search", "help", "inbox"}
 
 def _is_unsure(value: str) -> bool:
     return (value or "").strip().lower() == "unsure"
@@ -265,13 +270,21 @@ BRAND_PROFILE_SECTIONS = [
 
 
 @app.get("/dashboard")
-async def dashboard(request: Request, tab: str = "brand-profile", q: str = ""):
+async def dashboard(request: Request, tab: str = "", q: str = ""):
     user = request.session.get("user")
     if not user:
         return RedirectResponse(url="/signup")
-    if tab not in DASHBOARD_TABS:
-        tab = "brand-profile"
     account_type = request.session.get("account_type") or "Account type not set"
+
+    if account_type == "Member":
+        default_tab = "my-stuff"
+        allowed_tabs = MEMBER_DASHBOARD_TABS | SHARED_DASHBOARD_TABS
+    else:
+        default_tab = "brand-profile"
+        allowed_tabs = BRAND_DASHBOARD_TABS | SHARED_DASHBOARD_TABS
+
+    if tab not in allowed_tabs:
+        tab = default_tab
 
     brand_profile = None
     if tab in ("brand-profile", "manual-enrol"):
