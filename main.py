@@ -27,6 +27,8 @@ from ai_analysis import (
     fetch_website_text,
 )
 from auth import AUTH0_CLIENT_ID, AUTH0_CONFIGURED, AUTH0_DOMAIN, oauth
+from conversation_agent import CONVERSATION_CONFIGURED, ConversationError
+from conversation_agent import ask as ask_conversation_agent
 
 logger = logging.getLogger(__name__)
 
@@ -419,6 +421,35 @@ async def brand_profile_ai_analysis_retry(request: Request):
         return JSONResponse({})
 
     return JSONResponse(result)
+
+
+@app.post("/dashboard/conversation")
+async def dashboard_conversation(request: Request):
+    """Handle one turn of the member "Conversation" tab's chat.
+
+    Called via fetch() from the chat window's own script, not a full page
+    navigation, so it returns JSON rather than rendering a template.
+    """
+    user = request.session.get("user")
+    if not user:
+        raise HTTPException(status_code=401)
+
+    form = await request.form()
+    message = str(form.get("message", "")).strip()
+
+    if not message:
+        return JSONResponse({"reply": ""})
+
+    if not CONVERSATION_CONFIGURED:
+        return JSONResponse({"reply": "Conversation isn't configured yet."})
+
+    try:
+        reply = await ask_conversation_agent(user.get("email"), message)
+    except ConversationError:
+        logger.exception("Conversation agent failed")
+        return JSONResponse({"reply": "Sorry, I couldn't process that just now. Please try again."})
+
+    return JSONResponse({"reply": reply or "Sorry, I don't have a response for that."})
 
 
 @app.post("/dashboard/brand-profile/delete")

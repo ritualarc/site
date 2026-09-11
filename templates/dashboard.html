@@ -265,16 +265,41 @@
     }
 
     .chat-messages {
+      display: flex;
+      flex-direction: column;
       min-height: 220px;
       max-height: 320px;
       overflow-y: auto;
       padding: 1rem;
+      gap: 0.6rem;
     }
 
     .chat-placeholder {
       color: var(--ink-dim);
       font-style: italic;
       margin: 0;
+    }
+
+    .chat-message {
+      margin: 0;
+      padding: 0.55rem 0.85rem;
+      border-radius: 8px;
+      max-width: 85%;
+      font-size: 0.95rem;
+      white-space: pre-wrap;
+      overflow-wrap: break-word;
+    }
+
+    .chat-message-user {
+      align-self: flex-end;
+      background: var(--accent);
+      color: #1a1a1a;
+    }
+
+    .chat-message-assistant {
+      align-self: flex-start;
+      background: #1c1a15;
+      color: var(--ink);
     }
 
     .chat-input-row {
@@ -716,14 +741,71 @@
       {% elif tab == "conversation" %}
       <h2 class="tab-title">Conversation</h2>
       <div class="chat-window">
-        <div class="chat-messages">
+        <div class="chat-messages" id="chat-messages">
           <p class="chat-placeholder">Say hello — I'm listening.</p>
         </div>
         <div class="chat-input-row">
-          <input type="text" class="text-input" placeholder="Type a message&hellip;" autocomplete="off" />
-          <button type="button" class="enrol">Send</button>
+          <input type="text" class="text-input" id="chat-input" placeholder="Type a message&hellip;" autocomplete="off" />
+          <button type="button" class="enrol" id="chat-send">Send</button>
         </div>
       </div>
+      <script>
+        (function () {
+          var messagesEl = document.getElementById("chat-messages");
+          var inputEl = document.getElementById("chat-input");
+          var sendBtn = document.getElementById("chat-send");
+          var placeholderCleared = false;
+
+          function appendMessage(text, who) {
+            if (!placeholderCleared) {
+              messagesEl.innerHTML = "";
+              placeholderCleared = true;
+            }
+            var p = document.createElement("p");
+            p.className = "chat-message " + (who === "user" ? "chat-message-user" : "chat-message-assistant");
+            p.textContent = text;
+            messagesEl.appendChild(p);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+          }
+
+          function send() {
+            var text = inputEl.value.trim();
+            if (!text || sendBtn.disabled) return;
+
+            appendMessage(text, "user");
+            inputEl.value = "";
+            sendBtn.disabled = true;
+
+            var body = new URLSearchParams();
+            body.set("message", text);
+
+            fetch("/dashboard/conversation", {
+              method: "POST",
+              headers: { "Content-Type": "application/x-www-form-urlencoded" },
+              body: body.toString(),
+            })
+              .then(function (response) {
+                return response.ok ? response.json() : { reply: "Sorry, something went wrong." };
+              })
+              .catch(function () {
+                return { reply: "Sorry, something went wrong." };
+              })
+              .then(function (data) {
+                appendMessage((data && data.reply) || "Sorry, something went wrong.", "assistant");
+                sendBtn.disabled = false;
+                inputEl.focus();
+              });
+          }
+
+          sendBtn.addEventListener("click", send);
+          inputEl.addEventListener("keydown", function (event) {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              send();
+            }
+          });
+        })();
+      </script>
       {% elif tab == "care" %}
       <p>Care — what can happen next: rewear, restyle, repair, alter, maintain or eventually pass on.</p>
       {% elif tab == "search" %}

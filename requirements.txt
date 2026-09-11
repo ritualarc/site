@@ -7,3 +7,4 @@ itsdangerous==2.2.0
 asyncpg==0.29.0
 cryptography==43.0.1
 langchain-openai==0.2.14
+langchain==0.3.7

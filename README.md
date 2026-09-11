@@ -138,6 +138,25 @@ requested shape exactly, and this list of fields may grow later.
 Whichever model actually served each request (primary or fallback) is logged as `AI brand analysis
 served by model: <model id>`, read from the API response itself rather than assumed from config.
 
+## Member Conversation tab (tool-calling agent)
+
+The Member "Conversation" tab (`conversation_agent.py`) is a LangChain tool-calling agent
+(`create_tool_calling_agent` + `AgentExecutor`), reusing the same `AI_GATEWAY_API_KEY`/`AI_MODEL`
+config as brand analysis above — no separate setup needed. It has two stubbed tools (`agent_tools.py`):
+`my_wardrobe_tool` (matches a hardcoded 12-item wardrobe against an event/weather/garment-type query)
+and `weather_tool` (returns a random weather value per call — not a real forecast). The chat window
+POSTs to `/dashboard/conversation` via `fetch()` and appends the reply as a chat bubble; if the agent
+isn't configured or the request fails, it shows a plain-text fallback in the chat rather than breaking.
+
+**Cross-message memory** is stored in the same Neon database as account type and brand profiles
+(`account_store.py`), in a `conversation_messages` table (`email_hmac`, `role`, encrypted `content`,
+`created_at`) keyed by the member's email the same way — message content is encrypted with the same
+AES-256-GCM scheme, one fresh random IV per row. Before each turn, the member's last 20 messages
+(`MAX_HISTORY_MESSAGES` in `conversation_agent.py`) are loaded and passed to the agent as
+`chat_history`; after the reply, both the member's message and the assistant's reply are appended.
+If the database isn't configured, or a read/write fails, the conversation still works — it just
+degrades to a single stateless turn with no memory for that call.
+
 ## Deploying to Vercel
 
 ```bash

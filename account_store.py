@@ -78,6 +78,23 @@ async def ensure_schema() -> None:
             )
             """
         )
+        await conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS conversation_messages (
+                id BIGSERIAL PRIMARY KEY,
+                email_hmac BYTEA NOT NULL,
+                role TEXT NOT NULL,
+                content BYTEA NOT NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+            )
+            """
+        )
+        await conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_conversation_messages_email_hmac_created_at
+                ON conversation_messages (email_hmac, created_at)
+            """
+        )
     finally:
         await conn.close()
 
@@ -203,3 +220,65 @@ async def delete_brand_profile(email: str) -> None:
         raise AccountStoreError(f"Failed to delete brand profile: {exc}") from exc
     finally:
         await conn.close()
+
+
+async def append_conversation_message(email: str, role: str, content: str) -> None:
+    """Append one turn (role='user' or 'assistant') to a member's conversation history.
+
+    Only the message content is encrypted; role is left as plaintext since it's not
+    personal data and lets history be read back without decrypting every row just to
+    know whose turn it was.
+    """
+    aes_key, hmac_key = _derive_keys()
+    email_hmac = _hmac_email(email, hmac_key)
+
+    iv = os.urandom(12)
+    ciphertext = AESGCM(aes_key).encrypt(iv, content.encode("utf-8"), None)
+    blob = iv + ciphertext
+
+    conn = await _connect()
+    try:
+        await conn.execute(
+            "INSERT INTO conversation_messages (email_hmac, role, content) VALUES ($1, $2, $3)",
+            email_hmac,
+            role,
+            blob,
+        )
+    except asyncpg.PostgresError as exc:
+        raise AccountStoreError(f"Failed to save conversation message: {exc}") from exc
+    finally:
+        await conn.close()
+
+
+async def get_recent_conversation_messages(email: str, limit: int = 20) -> list[dict]:
+    """Return a member's most recent conversation turns, oldest first."""
+    aes_key, hmac_key = _derive_keys()
+    email_hmac = _hmac_email(email, hmac_key)
+
+    conn = await _connect()
+    try:
+        rows = await conn.fetch(
+            """
+            SELECT role, content FROM conversation_messages
+            WHERE email_hmac = $1
+            ORDER BY created_at DESC
+            LIMIT $2
+            """,
+            email_hmac,
+            limit,
+        )
+    except asyncpg.PostgresError as exc:
+        raise AccountStoreError(f"Failed to load conversation history: {exc}") from exc
+    finally:
+        await conn.close()
+
+    messages = []
+    for row in reversed(rows):
+        blob = bytes(row["content"])
+        iv, ciphertext = blob[:12], blob[12:]
+        try:
+            plaintext = AESGCM(aes_key).decrypt(iv, ciphertext, None)
+        except Exception as exc:
+            raise AccountStoreError(f"Failed to decrypt conversation message: {exc}") from exc
+        messages.append({"role": row["role"], "content": plaintext.decode("utf-8")})
+    return messages
