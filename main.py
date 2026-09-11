@@ -187,8 +187,9 @@ BRAND_DASHBOARD_TABS = {
 }
 
 MEMBER_DASHBOARD_TABS = {
-    "my-stuff",
-    "speak-to-me",
+    "my-arc",
+    "my-wardrobe",
+    "conversation",
     "care",
 }
 
@@ -277,7 +278,7 @@ async def dashboard(request: Request, tab: str = "", q: str = ""):
     account_type = request.session.get("account_type") or "Account type not set"
 
     if account_type == "Member":
-        default_tab = "my-stuff"
+        default_tab = "my-arc"
         allowed_tabs = MEMBER_DASHBOARD_TABS | SHARED_DASHBOARD_TABS
     else:
         default_tab = "brand-profile"

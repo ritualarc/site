@@ -481,8 +481,9 @@
     </div>
     <div class="tab-group">
       {% if account_type == "Member" %}
-      <a class="tab-button{% if tab == 'my-stuff' %} active{% endif %}" href="/dashboard?tab=my-stuff">My Stuff</a>
-      <a class="tab-button{% if tab == 'speak-to-me' %} active{% endif %}" href="/dashboard?tab=speak-to-me">Speak to Me</a>
+      <a class="tab-button{% if tab == 'my-arc' %} active{% endif %}" href="/dashboard?tab=my-arc">My Arc</a>
+      <a class="tab-button{% if tab == 'my-wardrobe' %} active{% endif %}" href="/dashboard?tab=my-wardrobe">My Wardrobe</a>
+      <a class="tab-button{% if tab == 'conversation' %} active{% endif %}" href="/dashboard?tab=conversation">Conversation</a>
       <a class="tab-button{% if tab == 'care' %} active{% endif %}" href="/dashboard?tab=care">Care</a>
       {% else %}
       <a class="tab-button{% if tab in ('brand-profile', 'ai-magic', 'manual-enrol', 'delete-profile-confirm') %} active{% endif %}" href="/dashboard?tab=brand-profile">Brand Profile</a>
@@ -708,10 +709,12 @@
       <p>Please enrol the brand before products.</p>
       {% elif tab == "intelligence" %}
       <p>What should go here???</p>
-      {% elif tab == "my-stuff" %}
-      <p>Coming Soon</p>
-      {% elif tab == "speak-to-me" %}
-      <h2 class="tab-title">Speak to Me</h2>
+      {% elif tab == "my-arc" %}
+      <p>TODO: My Arc — the member's personalised overview: observations, prompts, recent activity and things Ritual Arc has learned or suggests revisiting.</p>
+      {% elif tab == "my-wardrobe" %}
+      <p>TODO: My Wardrobe — their garments and the evolving history/relationship with each piece.</p>
+      {% elif tab == "conversation" %}
+      <h2 class="tab-title">Conversation</h2>
       <div class="chat-window">
         <div class="chat-messages">
           <p class="chat-placeholder">Say hello — I'm listening.</p>
@@ -722,7 +725,7 @@
         </div>
       </div>
       {% elif tab == "care" %}
-      <p>Coming Soon</p>
+      <p>Care — what can happen next: rewear, restyle, repair, alter, maintain or eventually pass on.</p>
       {% elif tab == "search" %}
       <p>Search not implemented yet</p>
       {% elif tab == "help" %}
